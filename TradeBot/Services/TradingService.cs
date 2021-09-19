@@ -17,7 +17,6 @@ namespace TradeBot
         private readonly AppSettings _settings;
         private readonly MarketDataListenerService _marketDataListenerService;
         private readonly StrategyFactory _strategyFactory;
-        private readonly BinanceStreamManager _binanceStreamManager;
         private readonly ILogger _logger;
 
         public TradingService(AppSettings settings, 

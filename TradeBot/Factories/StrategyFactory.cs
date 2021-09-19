@@ -12,11 +12,11 @@ namespace TradeBot.Factories
     {
         private Dictionary<string, Func<AutoTrader>> _strategies;
 
-        public StrategyFactory(IPairRepository pairRepository, ISnapshotRepository snapshotRepository)
+        public StrategyFactory(IServiceProvider sp)
         {
             _strategies = new Dictionary<string, Func<AutoTrader>>()
             {
-                ["default"] = () => new DefaultStrategy(pairRepository, snapshotRepository)
+                ["default"] = () => (AutoTrader) sp.GetService(typeof(DefaultStrategy))
             };
         }
 

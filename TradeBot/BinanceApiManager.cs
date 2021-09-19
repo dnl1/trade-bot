@@ -11,7 +11,19 @@ namespace TradeBot
     {
         private readonly string _baseUrl;
         private readonly AppSettings _settings;
+        private readonly ILogger _logger;
+        private readonly HttpClient _httpClient;
 
-        public BinanceApiManager(AppSettings settings) => _settings = settings;
+        public BinanceApiManager(AppSettings settings, ILogger logger, HttpClient httpClient)
+        {
+            _settings = settings;
+            _logger = logger;
+            _httpClient = httpClient;
+        }
+
+        internal void BuyAlt(string origin, string target)
+        {
+            
+        }
     }
 }
