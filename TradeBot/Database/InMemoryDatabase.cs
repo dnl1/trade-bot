@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TradeBot.Database
 {
-    internal class InMemoryDatabase : IDatabase
+    internal class InMemoryDatabase<T> : IDatabase<T> where T : class
     {
         public Dictionary<string, object> Db { get; set; }
         private object _locker;
@@ -17,7 +17,15 @@ namespace TradeBot.Database
             _locker = new object();
         }
 
-        public T? GetById<T>(string id)
+        public IEnumerable<T> GetAll()
+        {
+            foreach (var key in Db.Keys)
+            {
+                yield return (T)Db[key];
+            }
+        }
+
+        public T? GetByKey(string id)
         {
             if (Db.ContainsKey(id))
             {
@@ -27,7 +35,7 @@ namespace TradeBot.Database
             return default;
         }
 
-        public void Save<T>(string id, T obj)
+        public void Save(string id, T obj)
         {
             lock (_locker)
             {

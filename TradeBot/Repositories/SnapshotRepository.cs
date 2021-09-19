@@ -9,9 +9,9 @@ namespace TradeBot.Repositories
 {
     internal class SnapshotRepository : ISnapshotRepository
     {
-        private readonly IDatabase _database;
+        private readonly IDatabase<Snapshot> _database;
 
-        public SnapshotRepository(IDatabase database)
+        public SnapshotRepository(IDatabase<Snapshot> database)
         {
             _database = database;
         }
@@ -21,9 +21,7 @@ namespace TradeBot.Repositories
             _database.Save($"{snapshot.Symbol}", snapshot);
         }
 
-        public Snapshot Get(string symbol)
-        {
-            return _database.GetById<Snapshot>(symbol);
-        }
+        public Snapshot Get(string symbol) => _database.GetByKey(symbol);
+        public IEnumerable<Snapshot> GetAll() => _database.GetAll();
     }
 }

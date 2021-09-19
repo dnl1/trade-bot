@@ -4,7 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using TradeBot;
 using TradeBot.Database;
+using TradeBot.Factories;
 using TradeBot.Repositories;
+using TradeBot.Services;
 using TradeBot.Settings;
 
 IConfiguration? Configuration = null;
@@ -19,14 +21,18 @@ Host.CreateDefaultBuilder(args)
      })
     .ConfigureServices(services =>
     {
-        services.AddHostedService<MarketDataListener>();
+        services.AddHostedService<TradingService>();
 
         var appSettings = new AppSettings();
         Configuration.Bind(appSettings);
 
         services.AddSingleton(appSettings);
-        services.AddSingleton<IDatabase, InMemoryDatabase>();
+        services.AddSingleton<BinanceApiManager>();
+        services.AddSingleton<BinanceStreamManager>();
+        services.AddSingleton<MarketDataListenerService>();
+        services.AddSingleton<StrategyFactory>();
+        services.AddSingleton<ILogger>(new ConsoleLogger("tradebot-logger"));
+        services.AddSingleton(typeof(IDatabase<>), typeof(InMemoryDatabase<>));
         services.AddSingleton<ISnapshotRepository, SnapshotRepository>();
+        services.AddSingleton<IPairRepository, PairRepository>();
     }).Build().Run();
-
-Thread.Sleep(-1);

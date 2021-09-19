@@ -20,38 +20,42 @@ namespace TradeBot
             _baseUrl = "wss://stream.binance.com:9443/ws";
         }
 
-        public async Task SubscribeAsync(IEnumerable<string> tickers, Action<Snapshot> action, CancellationToken cancellationToken)
+        public void Subscribe(IEnumerable<string> tickers, Action<Snapshot> action, CancellationToken cancellationToken)
         {
-            var socket = new ClientWebSocket();
-
-            await socket.ConnectAsync(new Uri($"{_baseUrl}"), cancellationToken);
-
-            object payload = new {
-                method = "SUBSCRIBE",
-                @params = tickers.Select(ticker => $"{ticker.ToLower()}@aggTrade"),
-                id = 1 
-            };
-
-            string payloadStr = JsonConvert.SerializeObject(payload);
-            var sndBuffer = new ArraySegment<byte>(Encoding.UTF8.GetBytes(payloadStr));
-
-            await socket.SendAsync(sndBuffer, WebSocketMessageType.Text, true, cancellationToken);
-
-            var rcvBytes = new byte[1000];
-            var rcvBuffer = new ArraySegment<byte>(rcvBytes);
-
-            WebSocketReceiveResult ping = await socket.ReceiveAsync(rcvBuffer, cancellationToken);
-
-            while (true)
+            Task.Factory.StartNew(async () =>
             {
-                WebSocketReceiveResult rcvResult = await socket.ReceiveAsync(rcvBuffer, cancellationToken);
-                byte[] msgBytes = rcvBuffer.Skip(rcvBuffer.Offset).Take(rcvResult.Count).ToArray();
-                string rcvMsg = Encoding.UTF8.GetString(msgBytes);
-                var obj = JsonConvert.DeserializeObject<Snapshot>(rcvMsg);
+                var socket = new ClientWebSocket();
 
-                if(null != obj)
-                    action(obj);
-            }
+                await socket.ConnectAsync(new Uri($"{_baseUrl}"), cancellationToken);
+
+                object payload = new
+                {
+                    method = "SUBSCRIBE",
+                    @params = tickers.Select(ticker => $"{ticker.ToLower()}@aggTrade"),
+                    id = 1
+                };
+
+                string payloadStr = JsonConvert.SerializeObject(payload);
+                var sndBuffer = new ArraySegment<byte>(Encoding.UTF8.GetBytes(payloadStr));
+
+                await socket.SendAsync(sndBuffer, WebSocketMessageType.Text, true, cancellationToken);
+
+                var rcvBytes = new byte[1000];
+                var rcvBuffer = new ArraySegment<byte>(rcvBytes);
+
+                WebSocketReceiveResult ping = await socket.ReceiveAsync(rcvBuffer, cancellationToken);
+
+                while (true)
+                {
+                    WebSocketReceiveResult rcvResult = await socket.ReceiveAsync(rcvBuffer, cancellationToken);
+                    byte[] msgBytes = rcvBuffer.Skip(rcvBuffer.Offset).Take(rcvResult.Count).ToArray();
+                    string rcvMsg = Encoding.UTF8.GetString(msgBytes);
+                    var obj = JsonConvert.DeserializeObject<Snapshot>(rcvMsg);
+
+                    if (null != obj)
+                        action(obj);
+                }
+            },TaskCreationOptions.LongRunning);
         }
     }
 }

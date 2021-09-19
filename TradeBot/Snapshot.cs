@@ -22,7 +22,7 @@ namespace TradeBot
         public long AggTradeId { get; set; }
 
         [JsonProperty("p")]
-        public string Price { get; set; }
+        public decimal Price { get; set; }
 
         [JsonProperty("q")]
         public string Quantity { get; set; }

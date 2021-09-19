@@ -6,9 +6,10 @@ using System.Threading.Tasks;
 
 namespace TradeBot.Database
 {
-    internal interface IDatabase
+    internal interface IDatabase<T> where T : class
     {
-        public void Save<T>(string id, T obj);
-        public T? GetById<T>(string id);
+        public void Save(string key, T obj);
+        public T? GetByKey(string key);
+        public IEnumerable<T> GetAll();
     }
 }
