@@ -35,6 +35,7 @@ Host.CreateDefaultBuilder(args)
         services.AddSingleton<MarketDataListenerService>();
         services.AddSingleton<StrategyFactory>();
         services.AddSingleton<DefaultStrategy>();
+        services.AddSingleton<BinanceCache>();
         services.AddSingleton<ILogger>(new ConsoleLogger("tradebot-logger"));
         services.AddSingleton(typeof(IDatabase<>), typeof(InMemoryDatabase<>));
         services.AddSingleton<ISnapshotRepository, SnapshotRepository>();

@@ -46,14 +46,16 @@ namespace TradeBot.Strategies
 
                 _logger.Information($"Setting initial coin to {currentCoinSymbol}");
 
-                _coinRepository.SaveCurrent(new Coin
+                var currentCoin = new Coin
                 {
                     Symbol = currentCoinSymbol,
-                });
+                };
+
+                _coinRepository.SaveCurrent(currentCoin);
 
                 _logger.Information("Purchasing {current_coin} to begin trading");
 
-                _manager.BuyAlt(currentCoinSymbol, _appSettings.Bridge);
+                _manager.BuyAlt(currentCoin, new Coin(_appSettings.Bridge));
 
                 _logger.Information("Ready to start trading");
             }
