@@ -32,6 +32,7 @@ Host.CreateDefaultBuilder(args)
         services.AddSingleton(appSettings);
         services.AddSingleton<BinanceApiManager>();
         services.AddSingleton<BinanceStreamManager>();
+        services.AddSingleton<BinanceApiClient>();
         services.AddSingleton<MarketDataListenerService>();
         services.AddSingleton<StrategyFactory>();
         services.AddSingleton<DefaultStrategy>();
@@ -42,7 +43,7 @@ Host.CreateDefaultBuilder(args)
         services.AddSingleton<IPairRepository, PairRepository>();
         services.AddSingleton<ICoinRepository, CoinRepository>();
 
-        services.AddHttpClient<BinanceApiManager>().AddPolicyHandler(p => 
+        services.AddHttpClient<BinanceApiClient>().AddPolicyHandler(p => 
         HttpPolicyExtensions
         .HandleTransientHttpError()
         .WaitAndRetryAsync(20, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2,

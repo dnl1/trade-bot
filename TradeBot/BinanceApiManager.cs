@@ -13,18 +13,19 @@ namespace TradeBot
         private readonly string _baseUrl;
         private readonly AppSettings _settings;
         private readonly ILogger _logger;
+        private readonly ISnapshotRepository _snapshotRepository;
+        private readonly BinanceApiClient _apiClient;
         private readonly BinanceCache _cache;
-        private readonly HttpClient _httpClient;
 
-        public BinanceApiManager(AppSettings settings, ILogger logger, BinanceCache cache, HttpClient httpClient)
+        public BinanceApiManager(AppSettings settings, ILogger logger, ISnapshotRepository snapshotRepository, BinanceApiClient apiClient)
         {
             _settings = settings;
             _logger = logger;
-            _cache = cache;
-            _httpClient = httpClient;
+            _snapshotRepository = snapshotRepository;
+            _apiClient = apiClient;
         }
 
-        internal void BuyAlt(Coin origin, Coin target)
+        internal async Task BuyAlt(Coin origin, Coin target)
         {
             var trade = new Trade(origin, target, Side.BUY);
 
@@ -32,17 +33,19 @@ namespace TradeBot
             string targetSymbol = target.Symbol;
             decimal fromCoinPrice = GetTickerPrice(originSymbol + targetSymbol);
 
+            await GetAccount();
+
         }
 
-        public decimal GetTickerPrice(string symbol)
+        internal async Task GetAccount()
         {
-            bool ok = _cache.TickerValues.TryGetValue(symbol, out decimal price);
-            if (!ok)
-            {
+            await _apiClient.GetAccount();
+        }
 
-            }
-
-            return 0;
+        private decimal GetTickerPrice(string symbol)
+        {
+            return _snapshotRepository.Get(symbol).Price;
+            
         }
 
     }

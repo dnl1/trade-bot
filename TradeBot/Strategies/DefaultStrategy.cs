@@ -31,10 +31,10 @@ namespace TradeBot.Strategies
         public override void Initialize()
         {
             base.Initialize();
-            InitializeCurrentCoin();
+            InitializeCurrentCoin().Wait();
         }
 
-        private void InitializeCurrentCoin()
+        private async Task InitializeCurrentCoin()
         {
             var coin = _coinRepository.GetCurrent();
 
@@ -58,9 +58,9 @@ namespace TradeBot.Strategies
 
                 _coinRepository.SaveCurrent(currentCoin);
 
-                _logger.Information("Purchasing {current_coin} to begin trading");
+                _logger.Information($"Purchasing {currentCoinSymbol} to begin trading");
 
-                _manager.BuyAlt(currentCoin, new Coin(_appSettings.Bridge));
+                await _manager.BuyAlt(currentCoin, new Coin(_appSettings.Bridge));
 
                 _logger.Information("Ready to start trading");
             }
