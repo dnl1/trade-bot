@@ -45,7 +45,7 @@ namespace TradeBot
 
             _marketDataListenerService.GetCountdownEvent().Wait();
 
-            strategy.InitializeTradeThresholds();
+            strategy.Initialize();
         }
 
         public Task StopAsync(CancellationToken cancellationToken)

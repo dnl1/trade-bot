@@ -22,11 +22,16 @@ namespace TradeBot.Strategies
             BinanceApiManager manager,
             AppSettings appSettings) : base(pairRepository, snapshotRepository)
         {
-            InitializeCurrentCoin();
             _coinRepository = coinRepository;
             _logger = logger;
             _manager = manager;
             _appSettings = appSettings;
+        }
+
+        public override void Initialize()
+        {
+            base.Initialize();
+            InitializeCurrentCoin();
         }
 
         private void InitializeCurrentCoin()

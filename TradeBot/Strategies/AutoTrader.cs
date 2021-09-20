@@ -18,12 +18,17 @@ namespace TradeBot.Strategies
             this._snapshotRepository = snapshotRepository;
         }
 
+        public virtual void Initialize()
+        {
+            InitializeTradeThresholds();
+        }
+
         public void TransactionThroughBridge()
         {
 
         }
 
-        public void InitializeTradeThresholds()
+        private void InitializeTradeThresholds()
         {
             var snapshots = _snapshotRepository.GetAll().ToList();
             var pairsFromDb = _pairRepository.GetAll().ToList();

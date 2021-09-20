@@ -36,8 +36,8 @@ namespace TradeBot
 
         public decimal GetTickerPrice(string symbol)
         {
-            decimal? price = _cache.TickerValues[symbol];
-            if (null == price)
+            bool ok = _cache.TickerValues.TryGetValue(symbol, out decimal price);
+            if (!ok)
             {
 
             }

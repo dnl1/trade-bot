@@ -57,5 +57,7 @@ namespace TradeBot
                 }
             },TaskCreationOptions.LongRunning);
         }
+
+
     }
 }
