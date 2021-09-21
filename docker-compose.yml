@@ -1,0 +1,7 @@
+services:     
+  trade-bot:
+    image: trade-bot
+    container_name: trade-bot
+    build:
+      context: .
+      dockerfile: Dockerfile
