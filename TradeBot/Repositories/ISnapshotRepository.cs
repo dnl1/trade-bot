@@ -1,4 +1,6 @@
-﻿namespace TradeBot.Repositories
+﻿using System.Collections.Generic;
+
+namespace TradeBot.Repositories
 {
     internal interface ISnapshotRepository
     {
