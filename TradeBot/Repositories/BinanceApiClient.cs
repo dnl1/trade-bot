@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web;
 using TradeBot.Settings;
@@ -66,19 +67,19 @@ namespace TradeBot.Repositories
 
         public async Task GetAccount()
         {
-            await Get("account", true, PRIVATE_API_VERSION);
+            await Get<object>("account", true, PRIVATE_API_VERSION);
         }
 
-        private async Task Get(string path, bool signed, string version, Dictionary<string, string> data = null)
+        private async Task Get<T>(string path, bool signed, string version, Dictionary<string, string> data = null)
         {
             data = data ?? new Dictionary<string, string>();
 
             string url = CreateApiUri(path, signed, version);
 
-            await Request("GET", url, signed, data);
+            await Request<T>("GET", url, signed, data);
         }
 
-        private async Task Request(string method, string url, bool signed, Dictionary<string, string> data)
+        private async Task<T> Request<T>(string method, string url, bool signed, Dictionary<string, string> data)
         {
             data.Add("timestamp", (DateTimeOffset.Now.ToUnixTimeSeconds() * 1000).ToString());
 
@@ -96,15 +97,19 @@ namespace TradeBot.Repositories
                 string signature = BitConverter.ToString(hashBytes).Replace("-", "").ToLower();   
 
                 data.Add("signature", signature);                
-            }
 
-            queryString = ExtractQs(data);
+                queryString = ExtractQs(data);
+            }
 
             string requestUrl = $"{url}?{queryString}";
 
             var response = await _httpClient.SendAsync(new HttpRequestMessage(new HttpMethod(method), requestUrl));
 
-            var str = await response.Content.ReadAsStringAsync();
+            var json = await response.Content.ReadAsStringAsync();
+
+            T obj = JsonSerializer.Deserialize<T>(json);
+
+            return obj;
         }
 
         private static string ExtractQs(Dictionary<string, string> data)

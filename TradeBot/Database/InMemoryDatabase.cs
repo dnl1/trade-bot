@@ -8,12 +8,12 @@ namespace TradeBot.Database
 {
     internal class InMemoryDatabase<T> : IDatabase<T> where T : class
     {
-        public Dictionary<string, object> Db { get; set; }
+        public Dictionary<string, T> Db { get; set; }
         private object _locker;
 
         public InMemoryDatabase()
         {
-            Db = new Dictionary<string, object>();
+            Db = new Dictionary<string, T>();
             _locker = new object();
         }
 
@@ -21,7 +21,7 @@ namespace TradeBot.Database
         {
             foreach (var key in Db.Keys)
             {
-                yield return (T)Db[key];
+                yield return Db[key];
             }
         }
 
@@ -29,7 +29,7 @@ namespace TradeBot.Database
         {
             if (Db.ContainsKey(id))
             {
-                return (T)Db[id];
+                return Db[id];
             }
 
             return default;
