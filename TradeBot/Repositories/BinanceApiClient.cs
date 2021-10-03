@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -7,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using TradeBot.Converters;
 using TradeBot.Settings;
 
 namespace TradeBot.Repositories
@@ -36,6 +38,7 @@ namespace TradeBot.Repositories
         private const string PUBLIC_API_VERSION = "v1";
         private const string PRIVATE_API_VERSION = "v3";
         private const string MARGIN_API_VERSION = "v1";
+
         private const string FUTURES_API_VERSION = "v1";
         private const string FUTURES_API_VERSION2 = "v2";
         private const string OPTIONS_API_VERSION = "v1";
@@ -65,28 +68,41 @@ namespace TradeBot.Repositories
             PopHeaders();
         }
 
-        public async Task GetAccount()
+        public async Task<Account> GetAccount()
         {
-            await Get<object>("account", true, PRIVATE_API_VERSION);
+            return await Get<Account>("account", true, PRIVATE_API_VERSION);
         }
 
-        private async Task Get<T>(string path, bool signed, string version, Dictionary<string, string> data = null)
+        internal async Task<Symbol> GetSymbolInfo(string symbol)
         {
-            data = data ?? new Dictionary<string, string>();
+            var exhcangeInfo = await GetExchangeInfo();
+
+            var symbolObj = exhcangeInfo.Symbols.Find(s => s.SymbolName == symbol);
+
+            return symbolObj;
+        }
+
+        internal async Task<ExchangeInfo> GetExchangeInfo() =>
+            await Get<ExchangeInfo>("exchangeInfo", version: PRIVATE_API_VERSION);
+
+        private async Task<T> Get<T>(string path, bool signed = false, string version = PUBLIC_API_VERSION, Dictionary<string, string> data = null)
+        {
+            data ??= new Dictionary<string, string>();
 
             string url = CreateApiUri(path, signed, version);
 
-            await Request<T>("GET", url, signed, data);
+            return await Request<T>("GET", url, signed, data);
         }
 
         private async Task<T> Request<T>(string method, string url, bool signed, Dictionary<string, string> data)
         {
-            data.Add("timestamp", (DateTimeOffset.Now.ToUnixTimeSeconds() * 1000).ToString());
-
-            string queryString = ExtractQs(data);
+            string requestUrl = url;
 
             if (signed)
             {
+                data.Add("timestamp", (DateTimeOffset.Now.ToUnixTimeSeconds() * 1000).ToString());
+
+                string queryString = ExtractQs(data);
 
                 byte[] secretKey = Encoding.UTF8.GetBytes(_apiKeySecret);
                 byte[] qsBytes = Encoding.UTF8.GetBytes(queryString);
@@ -99,15 +115,24 @@ namespace TradeBot.Repositories
                 data.Add("signature", signature);                
 
                 queryString = ExtractQs(data);
-            }
 
-            string requestUrl = $"{url}?{queryString}";
+                requestUrl += $"?{queryString}";
+            }
 
             var response = await _httpClient.SendAsync(new HttpRequestMessage(new HttpMethod(method), requestUrl));
 
             var json = await response.Content.ReadAsStringAsync();
 
-            T obj = JsonSerializer.Deserialize<T>(json);
+            JsonSerializerSettings settings = new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore,
+                MissingMemberHandling = MissingMemberHandling.Ignore,
+                Formatting = Formatting.None,
+                DateFormatHandling = DateFormatHandling.IsoDateFormat,
+                Converters = new List<JsonConverter> { new DecimalConverter() }
+            };
+
+            T obj = JsonConvert.DeserializeObject<T>(json, settings);
 
             return obj;
         }
