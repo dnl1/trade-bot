@@ -47,6 +47,12 @@ namespace TradeBot
 
             _logger.Information($"BUY QTY {orderQty} of <{originSymbol}>");
 
+            if(orderQty == 0)
+            {
+                _logger.Warning("Stopping because there's no funds to BUY");
+                return;
+            }
+
             object order = null;
             var orderGuard = _streamManager.AcquireOrderGuard();
 
@@ -54,7 +60,7 @@ namespace TradeBot
             {
                 try
                 {
-
+                    await _apiClient.OrderLimitBuy(originSymbol + targetSymbol, orderQty, fromCoinPrice);
                 }
                 catch(Exception e)
                 {

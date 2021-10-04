@@ -40,6 +40,8 @@ namespace TradeBot.Repositories
         private const string MARGIN_API_VERSION = "v1";
 
         private const string FUTURES_API_VERSION = "v1";
+
+
         private const string FUTURES_API_VERSION2 = "v2";
         private const string OPTIONS_API_VERSION = "v1";
 
@@ -68,6 +70,24 @@ namespace TradeBot.Repositories
             PopHeaders();
         }
 
+        internal async Task OrderLimitBuy(string symbol, double orderQty, decimal price)
+        {
+            await OrderLimit(symbol, orderQty, price, Side.BUY);
+        }
+
+        private async Task OrderLimit(string symbol, double orderQty, decimal price, Side side)
+        {
+            await Post<object>("order", true, data: new Dictionary<string, string>
+            {
+                { "symbol", symbol },
+                { "quantity", orderQty.ToString() },
+                { "price", price.ToString() },
+                { "side", side == Side.BUY ? "BUY" : "SELL" },
+                { "type", "LIMIT" },
+                { "timeInForce", "GTC" }
+            });
+        }
+
         public async Task<Account> GetAccount()
         {
             return await Get<Account>("account", true, PRIVATE_API_VERSION);
@@ -92,6 +112,15 @@ namespace TradeBot.Repositories
             string url = CreateApiUri(path, signed, version);
 
             return await Request<T>("GET", url, signed, data);
+        }
+
+        private async Task<T> Post<T>(string path, bool signed = false, string version = PUBLIC_API_VERSION, Dictionary<string, string> data = null)
+        {
+            data ??= new Dictionary<string, string>();
+
+            string url = CreateApiUri(path, signed, version);
+
+            return await Request<T>("POST", url, signed, data);
         }
 
         private async Task<T> Request<T>(string method, string url, bool signed, Dictionary<string, string> data)
