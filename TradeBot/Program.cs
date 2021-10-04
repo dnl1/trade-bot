@@ -7,6 +7,7 @@ using Polly.Extensions.Http;
 using TradeBot;
 using TradeBot.Database;
 using TradeBot.Factories;
+using TradeBot.HostedServices;
 using TradeBot.Repositories;
 using TradeBot.Services;
 using TradeBot.Settings;
@@ -42,6 +43,8 @@ Host.CreateDefaultBuilder(args)
         services.AddSingleton<ISnapshotRepository, SnapshotRepository>();
         services.AddSingleton<IPairRepository, PairRepository>();
         services.AddSingleton<ICoinRepository, CoinRepository>();
+        services.AddSingleton<ITradeRepository, TradeRepository>();
+        services.AddSingleton<ITradeService, TradeService>();
 
         services.AddHttpClient<BinanceApiClient>().AddPolicyHandler(p => 
         HttpPolicyExtensions

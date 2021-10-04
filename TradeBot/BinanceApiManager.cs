@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using TradeBot.Repositories;
+using TradeBot.Services;
 using TradeBot.Settings;
 
 namespace TradeBot
@@ -10,20 +11,29 @@ namespace TradeBot
         private readonly AppSettings _settings;
         private readonly ILogger _logger;
         private readonly ISnapshotRepository _snapshotRepository;
+        private readonly ITradeService _tradeService;
+        private readonly BinanceStreamManager _streamManager;
         private readonly BinanceApiClient _apiClient;
         private readonly BinanceCache _cache;
 
-        public BinanceApiManager(AppSettings settings, ILogger logger, ISnapshotRepository snapshotRepository, BinanceApiClient apiClient)
+        public BinanceApiManager(AppSettings settings, 
+            ILogger logger, 
+            ISnapshotRepository snapshotRepository,
+            ITradeService tradeService,
+            BinanceStreamManager streamManager,
+            BinanceApiClient apiClient)
         {
             _settings = settings;
             _logger = logger;
             _snapshotRepository = snapshotRepository;
+            _tradeService = tradeService;
+            _streamManager = streamManager;
             _apiClient = apiClient;
         }
 
         internal async Task BuyAlt(Coin origin, Coin target)
         {
-            var trade = new Trade(origin, target, Side.BUY);
+            _tradeService.StartTradeLog(origin, target, Side.BUY);
 
             string originSymbol = origin.Symbol;
             string targetSymbol = target.Symbol;
@@ -37,6 +47,23 @@ namespace TradeBot
 
             _logger.Information($"BUY QTY {orderQty} of <{originSymbol}>");
 
+            object order = null;
+            var orderGuard = _streamManager.AcquireOrderGuard();
+
+            while (null == order)
+            {
+                try
+                {
+
+                }
+                catch(Exception e)
+                {
+                    _logger.Error(e.ToString());
+                }
+            }
+
+            _tradeService.SetOrdered(originBalance, targetBalance, orderQty);
+
 
         }
 
@@ -46,11 +73,6 @@ namespace TradeBot
             fromCoinPrice = fromCoinPrice ?? (GetTickerPrice(originSymbol + targetSymbol));
 
             decimal originTick = await GetAltTick(originSymbol, targetSymbol);
-
-            double originDbl = 2;
-
-            //        return math.floor(target_balance * 10 ** origin_tick / from_coin_price) / float(10 ** origin_tick)
-
 
             return Math.Floor((double)targetBalance * Math.Pow(10, (double)originTick) / (double)fromCoinPrice) / Math.Pow(10, (double)originTick);
         }

@@ -14,11 +14,15 @@ namespace TradeBot
     {
         private readonly AppSettings _settings;
         private readonly string _baseUrl;
+        private readonly Mutex _mutex;
+        private readonly Dictionary<string, int> _pendingOrders;
 
         public BinanceStreamManager(AppSettings settings)
         {
             _settings = settings;
             _baseUrl = "wss://stream.binance.com:9443/ws";
+
+            _mutex = new Mutex();
         }
 
         public void Subscribe(IEnumerable<string> tickers, Action<Snapshot> action, CancellationToken cancellationToken)
@@ -59,6 +63,9 @@ namespace TradeBot
             },TaskCreationOptions.LongRunning);
         }
 
-
+        internal OrderGuard AcquireOrderGuard()
+        {
+            return new OrderGuard(_pendingOrders, _mutex);
+        }
     }
 }

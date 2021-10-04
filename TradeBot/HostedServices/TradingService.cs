@@ -5,7 +5,7 @@ using Microsoft.Extensions.Hosting;
 using TradeBot.Factories;
 using TradeBot.Settings;
 
-namespace TradeBot.Services
+namespace TradeBot.HostedServices
 {
     internal class TradingService : IHostedService
     {

@@ -1,6 +1,6 @@
 ﻿namespace TradeBot
 {
-    enum Side
+    public enum Side
     {
         BUY,
         SELL

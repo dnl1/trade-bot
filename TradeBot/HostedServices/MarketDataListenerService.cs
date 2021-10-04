@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using TradeBot.Repositories;
 using TradeBot.Settings;
 
-namespace TradeBot.Services
+namespace TradeBot.HostedServices
 {
     internal class MarketDataListenerService
     {

@@ -1,6 +1,6 @@
 ﻿namespace TradeBot
 {
-    enum TradeState
+    public enum TradeState
     {
         Starting,
         Ordered,
