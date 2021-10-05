@@ -1,4 +1,6 @@
-﻿namespace TradeBot.Repositories
+﻿using TradeBot.Entities;
+
+namespace TradeBot.Repositories
 {
     internal interface ICoinRepository
     {

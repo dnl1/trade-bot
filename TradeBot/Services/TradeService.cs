@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using TradeBot.Entities;
+using TradeBot.Enums;
 using TradeBot.Repositories;
 
 namespace TradeBot.Services
@@ -18,13 +15,7 @@ namespace TradeBot.Services
 
         public void SetOrdered(decimal altStartingBalance, decimal cryptoStartingBalance, double altTradeAmount)
         {
-            var trade = new Trade
-            {
-                AltStartingBalance = altStartingBalance,
-                CryptoStartingBalance = cryptoStartingBalance,
-                AltTradeAmount = altTradeAmount,
-                State = TradeState.Ordered
-            };
+            var trade = new Trade(altStartingBalance, cryptoStartingBalance, altTradeAmount);
 
             _tradeRepository.Save(trade);
         }

@@ -1,16 +1,12 @@
-﻿namespace TradeBot
+﻿namespace TradeBot.Entities
 {
     public class Coin
     {
-        public Coin()
-        {
-        }
-
+        public string Symbol { get; }
+        
         public Coin(string symbol)
         {
             Symbol = symbol;
         }
-
-        public string Symbol { get; set; }
     }
 }

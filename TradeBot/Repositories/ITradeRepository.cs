@@ -1,4 +1,7 @@
-﻿namespace TradeBot.Repositories
+﻿using System.Collections.Generic;
+using TradeBot.Entities;
+
+namespace TradeBot.Repositories
 {
     public interface ITradeRepository
     {
