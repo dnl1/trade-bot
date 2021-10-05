@@ -1,4 +1,6 @@
-﻿using TradeBot.Database;
+﻿using System.Collections.Generic;
+using TradeBot.Database;
+using TradeBot.Entities;
 
 namespace TradeBot.Repositories
 {

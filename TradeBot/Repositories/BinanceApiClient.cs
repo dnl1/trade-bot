@@ -6,9 +6,10 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using TradeBot.Converters;
+using TradeBot.Enums;
+using TradeBot.Models;
 using TradeBot.Settings;
 
 namespace TradeBot.Repositories

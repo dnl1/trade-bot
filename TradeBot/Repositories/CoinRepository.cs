@@ -1,4 +1,5 @@
 ﻿using TradeBot.Database;
+using TradeBot.Entities;
 
 namespace TradeBot.Repositories
 {

@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using TradeBot.Entities;
 using TradeBot.Repositories;
 
 namespace TradeBot.Strategies
@@ -34,14 +35,8 @@ namespace TradeBot.Strategies
 
             var pairs = snapshots.SelectMany(x => snapshots, (x, y) => new Pair
             {
-                FromCoin = new Coin
-                {
-                    Symbol = x.Symbol,
-                },
-                ToCoin = new Coin
-                {
-                    Symbol = y.Symbol
-                }
+                FromCoin = new Coin(x.Symbol),
+                ToCoin = new Coin(y.Symbol)
             }).Where(p => p.FromCoin.Symbol != p.ToCoin.Symbol);
 
             foreach (var item in pairs)

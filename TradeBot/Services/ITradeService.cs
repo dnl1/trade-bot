@@ -1,4 +1,7 @@
-﻿namespace TradeBot.Services
+﻿using TradeBot.Entities;
+using TradeBot.Enums;
+
+namespace TradeBot.Services
 {
     public interface ITradeService
     {
