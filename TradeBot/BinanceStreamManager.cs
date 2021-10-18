@@ -27,6 +27,8 @@ namespace TradeBot
             _apiClient = binanceApiClient;
             _baseUrl = "wss://stream.binance.com:9443/ws";
 
+            _mutexes = new Dictionary<long, Mutex>();
+            _pendingOrders = new Dictionary<string, int>();
         }
 
         public void Subscribe<T>(IEnumerable<string> tickers, string streamName, Action<T> action, CancellationToken cancellationToken)
@@ -85,13 +87,10 @@ namespace TradeBot
                 string rcvMsg = Encoding.UTF8.GetString(msgBytes);
                 var obj = JsonConvert.DeserializeObject<OrderUpdateResult>(rcvMsg);
 
-                if (obj?.Status == "FILLED")
+                if(null != obj && obj.OrderId > 0)
                 {
-                    long orderId = obj?.OrderId ?? 0;
-                    if (_mutexes.ContainsKey(orderId))
-                    {
-                        _mutexes[orderId].ReleaseMutex();
-                    }
+                    BinanceCache.Orders[obj.OrderId] = obj;
+                    _mutexes[obj.OrderId].ReleaseMutex();
                 }
             }
         }

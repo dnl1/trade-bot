@@ -34,7 +34,7 @@ namespace TradeBot
         public string ExecutedQty { get; set; }
 
         [JsonProperty("cummulativeQuoteQty")]
-        public string CummulativeQuoteQty { get; set; }
+        public decimal CummulativeQuoteQty { get; set; }
 
         [JsonProperty("status")]
         public string Status { get; set; }

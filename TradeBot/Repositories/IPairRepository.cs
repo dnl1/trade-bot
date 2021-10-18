@@ -3,10 +3,11 @@ using TradeBot.Entities;
 
 namespace TradeBot.Repositories
 {
-    internal interface IPairRepository
+    public interface IPairRepository
     {
         Pair? Get(string fromSymbol, string toSymbol);
         IEnumerable<Pair> GetAll();
         void Save(Pair pair);
+        IEnumerable<Pair> GetPairsFrom(Coin currentCoin);
     }
 }

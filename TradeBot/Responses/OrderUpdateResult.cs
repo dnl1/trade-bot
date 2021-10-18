@@ -104,5 +104,10 @@ namespace TradeBot.Responses
 
         [JsonProperty("Q")]
         public string QuoteOrderQty { get; set; }
+
+        public override string ToString()
+        {
+            return JsonConvert.SerializeObject(this);
+        }
     }
 }

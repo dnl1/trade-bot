@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Hangfire;
 using Microsoft.Extensions.Hosting;
 using TradeBot.Factories;
 using TradeBot.Settings;
@@ -41,6 +42,9 @@ namespace TradeBot.HostedServices
             _marketDataListenerService.GetCountdownEvent().Wait();
 
             strategy.Initialize();
+
+            strategy.Scout();
+            //RecurringJob.AddOrUpdate("scouting", () => strategy.Scout(), "* * * * *");
         }
 
         public Task StopAsync(CancellationToken cancellationToken)

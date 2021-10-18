@@ -79,7 +79,7 @@ namespace TradeBot.Repositories
             await OrderLimit(symbol, orderQty, price, Side.BUY);
 
         private async Task<OrderResult> OrderLimit(string symbol, double orderQty, decimal price, Side side) =>
-            await Post<OrderResult>("order/test", true, data: new Dictionary<string, string>
+            await Post<OrderResult>("order", true, data: new Dictionary<string, string>
             {
                 { "symbol", symbol },
                 { "quantity", orderQty.ToString() },
@@ -93,6 +93,11 @@ namespace TradeBot.Repositories
         public async Task<Account> GetAccount()
         {
             return await Get<Account>("account", true, PRIVATE_API_VERSION);
+        }
+
+        public async Task<IEnumerable<TradeFee>> GetTradeFee()
+        {
+            return await RequestMarginApi<IEnumerable<TradeFee>>("get", "asset/tradeFee", true);
         }
 
         internal async Task<Symbol> GetSymbolInfo(string symbol)
@@ -123,6 +128,15 @@ namespace TradeBot.Repositories
             string url = CreateApiUri(path, signed, version);
 
             return await Request<T>("POST", url, signed, data);
+        }
+
+        private async Task<T> RequestMarginApi<T>(string method, string path, bool signed, Dictionary<string, string> data = null)
+        {
+            data ??= new Dictionary<string, string>();
+
+            string url = CreateMarginApiUri(path, signed);
+
+            return await Request<T>(method, url, signed, data);
         }
 
         private async Task<T> Request<T>(string method, string url, bool signed, Dictionary<string, string> data)
@@ -189,7 +203,11 @@ namespace TradeBot.Repositories
             }
         }
 
-
+        private string CreateMarginApiUri(string path, bool signed, string version = MARGIN_API_VERSION)
+        {
+            string url = MARGIN_API_URL;
+            return url + '/' + version + '/' + path;
+        }
         private string CreateApiUri(string path, bool signed, string version = PUBLIC_API_VERSION)
         {
             string url = API_URL;

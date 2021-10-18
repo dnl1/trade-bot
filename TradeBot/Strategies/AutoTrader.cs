@@ -4,10 +4,10 @@ using TradeBot.Repositories;
 
 namespace TradeBot.Strategies
 {
-    internal abstract class AutoTrader
+    public abstract class AutoTrader
     {
-        private readonly IPairRepository _pairRepository;
-        private readonly ISnapshotRepository _snapshotRepository;
+        public readonly IPairRepository _pairRepository;
+        public readonly ISnapshotRepository _snapshotRepository;
 
         public AutoTrader(IPairRepository pairRepository, ISnapshotRepository snapshotRepository)
         {
@@ -18,6 +18,11 @@ namespace TradeBot.Strategies
         public virtual void Initialize()
         {
             InitializeTradeThresholds();
+        }
+
+        public virtual void Scout()
+        {
+            throw new NotImplementedException();
         }
 
         public void TransactionThroughBridge()

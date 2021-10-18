@@ -2,7 +2,7 @@
 
 namespace TradeBot.Models
 {
-    internal class Snapshot
+    public class Snapshot
     {
         [JsonProperty("e")]
         public string EventType { get; set; }

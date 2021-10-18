@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Globalization;
 using System.Threading;
+using Hangfire;
+using Hangfire.MemoryStorage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -27,6 +29,7 @@ Host.CreateDefaultBuilder(args)
      })
     .ConfigureServices(services =>
     {
+        GlobalConfiguration.Configuration.UseMemoryStorage();
         services.AddHostedService<TradingService>();
 
         var appSettings = new AppSettings();
@@ -39,7 +42,6 @@ Host.CreateDefaultBuilder(args)
         services.AddSingleton<MarketDataListenerService>();
         services.AddSingleton<StrategyFactory>();
         services.AddSingleton<DefaultStrategy>();
-        services.AddSingleton<BinanceCache>();
         services.AddSingleton<ILogger>(new ConsoleLogger("tradebot-logger"));
         services.AddSingleton(typeof(IDatabase<>), typeof(InMemoryDatabase<>));
         services.AddSingleton<ISnapshotRepository, SnapshotRepository>();

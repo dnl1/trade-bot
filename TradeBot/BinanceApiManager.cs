@@ -4,6 +4,7 @@ using TradeBot.Entities;
 using TradeBot.Enums;
 using TradeBot.Models;
 using TradeBot.Repositories;
+using TradeBot.Responses;
 using TradeBot.Services;
 using TradeBot.Settings;
 
@@ -18,10 +19,9 @@ namespace TradeBot
         private readonly ITradeService _tradeService;
         private readonly BinanceStreamManager _streamManager;
         private readonly BinanceApiClient _apiClient;
-        private readonly BinanceCache _cache;
 
-        public BinanceApiManager(AppSettings settings, 
-            ILogger logger, 
+        public BinanceApiManager(AppSettings settings,
+            ILogger logger,
             ISnapshotRepository snapshotRepository,
             ITradeService tradeService,
             BinanceStreamManager streamManager,
@@ -45,13 +45,13 @@ namespace TradeBot
             var originBalance = await GetCurrencyBalance(originSymbol);
             var targetBalance = await GetCurrencyBalance(targetSymbol);
 
-            decimal fromCoinPrice = GetTickerPrice(originSymbol + targetSymbol);
+            decimal fromCoinPrice = GetTickerPrice(originSymbol + targetSymbol) ?? 0;
 
             double orderQty = await BuyQuantity(originSymbol, targetSymbol, targetBalance, fromCoinPrice);
 
             _logger.Info($"BUY QTY {orderQty} of <{originSymbol}>");
 
-            if(orderQty == 0)
+            if (orderQty == 0)
             {
                 _logger.Warn("Stopping because there's no funds to BUY");
                 return;
@@ -72,32 +72,72 @@ namespace TradeBot
                 }
             }
 
-            orderGuard.SetOrder(order.OrderId);
-            _tradeService.SetOrdered(originBalance, targetBalance, orderQty);
+            if (order?.OrderId == 0) return;
 
-            WaitForOrder(order.OrderId, orderGuard);
+            var trade = _tradeService.SetOrdered(originBalance, targetBalance, orderQty);
+
+            if (order.Status != OrderStatus.FILLED)
+            {
+                orderGuard.SetOrder(order.OrderId);
+
+                WaitForOrder(order.OrderId, orderGuard);
+            }
 
 
-            //_tradeService.SetOrdered(originBalance, targetBalance, orderQty);
+            _logger.Info($"Bought {originSymbol}");
 
+            _tradeService.SetComplete(trade, order.CummulativeQuoteQty);
+        }
+
+        internal async Task<decimal> GetFee(Coin fromCoin, Coin targetCoin, bool selling)
+        {
+            var fees = (await _apiClient.GetTradeFee()).ToList();
+            var snapTarget = _snapshotRepository.Get(targetCoin.Symbol);
+            throw new NotImplementedException();
         }
 
         private void WaitForOrder(long orderId, OrderGuard orderGuard)
         {
+            OrderUpdateResult? order = null;
+
+            while (null == order)
+            {
+                if (BinanceCache.Orders.ContainsKey(orderId))
+                {
+                    order = BinanceCache.Orders[orderId];
+                    _logger.Debug($"Waiting for order {orderId} to be created");
+                }
+
+                Thread.Sleep(1000);
+            }
+
+            _logger.Debug($"Order created: {order}");
+
             var mutex = orderGuard.GetMutex(orderId);
 
-            mutex.WaitOne();
-        }
+            while (order.Status != "FILLED")
+            {
+                order = BinanceCache.Orders[orderId];
 
-        private void WaitForOrder(string originSymbol, string targetSymbol, long orderId)
-        {
-            throw new NotImplementedException();
+                _logger.Debug($"Waiting for order {orderId} to be filled");
+
+                //long orderId = obj?.OrderId ?? 0;
+                //if (_mutexes.ContainsKey(orderId))
+                //{
+                //    _mutexes[orderId].ReleaseMutex();
+                //}
+            }
+
+            //_logger.debug($"Order filled: {order_status}")
+
+
+            mutex.WaitOne();
         }
 
         private async Task<double> BuyQuantity(string originSymbol, string targetSymbol, decimal? targetBalance, decimal? fromCoinPrice)
         {
             targetBalance = targetBalance ?? (await GetCurrencyBalance(targetSymbol));
-            fromCoinPrice = fromCoinPrice ?? (GetTickerPrice(originSymbol + targetSymbol));
+            fromCoinPrice = fromCoinPrice ?? (GetTickerPrice(originSymbol + targetSymbol)) ?? 0;
 
             decimal originTick = await GetAltTick(originSymbol, targetSymbol);
 
@@ -128,11 +168,7 @@ namespace TradeBot
             return await _apiClient.GetAccount();
         }
 
-        private decimal GetTickerPrice(string symbol)
-        {
-            return _snapshotRepository.Get(symbol). Price;
-            
-        }
+        public decimal? GetTickerPrice(string symbol) => _snapshotRepository.Get(symbol)?.Price;
 
     }
 }

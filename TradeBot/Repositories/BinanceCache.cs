@@ -1,9 +1,10 @@
 ﻿using System.Collections.Generic;
+using TradeBot.Responses;
 
 namespace TradeBot.Repositories
 {
-    internal class BinanceCache
+    internal static class BinanceCache
     {
-        public Dictionary<string, decimal> TickerValues { get; set; } = new Dictionary<string, decimal>();
+        public static Dictionary<long, OrderUpdateResult> Orders { get; set; } = new Dictionary<long, OrderUpdateResult>();
     }
 }
