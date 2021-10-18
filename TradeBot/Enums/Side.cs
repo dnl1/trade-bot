@@ -1,4 +1,4 @@
-﻿namespace TradeBot
+﻿namespace TradeBot.Enums
 {
     public enum Side
     {

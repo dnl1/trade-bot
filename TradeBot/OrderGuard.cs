@@ -1,4 +1,7 @@
 ﻿
+using System.Collections.Generic;
+using System.Threading;
+
 namespace TradeBot
 {
     internal class OrderGuard

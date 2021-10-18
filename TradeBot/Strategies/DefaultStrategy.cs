@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using TradeBot.Entities;
 using TradeBot.Repositories;
 using TradeBot.Settings;
 
@@ -35,7 +36,7 @@ namespace TradeBot.Strategies
         {
             var coin = _coinRepository.GetCurrent();
 
-            if(null == coin)
+            if(coin is null)
             {
                 string currentCoinSymbol = _appSettings.CurrentCoin;
 
@@ -48,10 +49,7 @@ namespace TradeBot.Strategies
 
                 _logger.Info($"Setting initial coin to {currentCoinSymbol}");
 
-                var currentCoin = new Coin
-                {
-                    Symbol = currentCoinSymbol,
-                };
+                var currentCoin = new Coin(currentCoinSymbol);
 
                 _coinRepository.SaveCurrent(currentCoin);
 

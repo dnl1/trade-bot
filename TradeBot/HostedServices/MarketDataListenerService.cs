@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using TradeBot.Models;
 using TradeBot.Repositories;
 using TradeBot.Settings;
 

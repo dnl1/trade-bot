@@ -5,6 +5,8 @@ VisualStudioVersion = 17.0.31710.8
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeBot", "TradeBot\TradeBot.csproj", "{ED795C4D-EFCB-4656-AF82-02ACB801F698}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeBot.Tests", "TradeBot.Tests\TradeBot.Tests.csproj", "{D6D27159-6CC8-46C4-B5D7-43083AF92A04}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{ED795C4D-EFCB-4656-AF82-02ACB801F698}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ED795C4D-EFCB-4656-AF82-02ACB801F698}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ED795C4D-EFCB-4656-AF82-02ACB801F698}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D6D27159-6CC8-46C4-B5D7-43083AF92A04}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D6D27159-6CC8-46C4-B5D7-43083AF92A04}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D6D27159-6CC8-46C4-B5D7-43083AF92A04}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D6D27159-6CC8-46C4-B5D7-43083AF92A04}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,4 +1,4 @@
-﻿namespace TradeBot
+﻿namespace TradeBot.Entities
 {
     public class Pair
     {

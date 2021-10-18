@@ -1,4 +1,8 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
+using TradeBot.Entities;
+using TradeBot.Enums;
+using TradeBot.Models;
 using TradeBot.Repositories;
 using TradeBot.Services;
 using TradeBot.Settings;

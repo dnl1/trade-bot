@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using TradeBot.Models;
 
 namespace TradeBot.Repositories
 {
