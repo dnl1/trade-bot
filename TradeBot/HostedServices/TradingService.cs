@@ -32,7 +32,7 @@ namespace TradeBot.HostedServices
         /// <returns></returns>
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            _logger.Information("Starting");
+            _logger.Info("Starting");
 
             await _marketDataListenerService.StartAsync(cancellationToken);
 

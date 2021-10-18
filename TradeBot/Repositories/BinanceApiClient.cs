@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using TradeBot.Converters;
+using TradeBot.Responses;
 using TradeBot.Settings;
 
 namespace TradeBot.Repositories
@@ -70,14 +71,14 @@ namespace TradeBot.Repositories
             PopHeaders();
         }
 
-        internal async Task OrderLimitBuy(string symbol, double orderQty, decimal price)
-        {
-            await OrderLimit(symbol, orderQty, price, Side.BUY);
-        }
+        internal async Task<ListenKeyWrapper> GetListenKey() =>
+            await Post<ListenKeyWrapper>("userDataStream", false);
 
-        private async Task OrderLimit(string symbol, double orderQty, decimal price, Side side)
-        {
-            await Post<object>("order", true, data: new Dictionary<string, string>
+        internal async Task<OrderResult> OrderLimitBuy(string symbol, double orderQty, decimal price) =>
+            await OrderLimit(symbol, orderQty, price, Side.BUY);
+
+        private async Task<OrderResult> OrderLimit(string symbol, double orderQty, decimal price, Side side) =>
+            await Post<OrderResult>("order/test", true, data: new Dictionary<string, string>
             {
                 { "symbol", symbol },
                 { "quantity", orderQty.ToString() },
@@ -86,7 +87,7 @@ namespace TradeBot.Repositories
                 { "type", "LIMIT" },
                 { "timeInForce", "GTC" }
             });
-        }
+        
 
         public async Task<Account> GetAccount()
         {

@@ -45,32 +45,49 @@ namespace TradeBot
 
             double orderQty = await BuyQuantity(originSymbol, targetSymbol, targetBalance, fromCoinPrice);
 
-            _logger.Information($"BUY QTY {orderQty} of <{originSymbol}>");
+            _logger.Info($"BUY QTY {orderQty} of <{originSymbol}>");
 
             if(orderQty == 0)
             {
-                _logger.Warning("Stopping because there's no funds to BUY");
+                _logger.Warn("Stopping because there's no funds to BUY");
                 return;
             }
 
-            object order = null;
+            OrderResult order = null;
             var orderGuard = _streamManager.AcquireOrderGuard();
 
             while (null == order)
             {
                 try
                 {
-                    await _apiClient.OrderLimitBuy(originSymbol + targetSymbol, orderQty, fromCoinPrice);
+                    order = await _apiClient.OrderLimitBuy(originSymbol + targetSymbol, orderQty, fromCoinPrice);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
-                    _logger.Error(e.ToString());
+                    _logger.Error($"Error at trying to order limit buy {e}");
                 }
             }
 
+            orderGuard.SetOrder(order.OrderId);
             _tradeService.SetOrdered(originBalance, targetBalance, orderQty);
 
+            WaitForOrder(order.OrderId, orderGuard);
 
+
+            //_tradeService.SetOrdered(originBalance, targetBalance, orderQty);
+
+        }
+
+        private void WaitForOrder(long orderId, OrderGuard orderGuard)
+        {
+            var mutex = orderGuard.GetMutex(orderId);
+
+            mutex.WaitOne();
+        }
+
+        private void WaitForOrder(string originSymbol, string targetSymbol, long orderId)
+        {
+            throw new NotImplementedException();
         }
 
         private async Task<double> BuyQuantity(string originSymbol, string targetSymbol, decimal? targetBalance, decimal? fromCoinPrice)

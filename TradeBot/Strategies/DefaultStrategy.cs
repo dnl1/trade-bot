@@ -46,7 +46,7 @@ namespace TradeBot.Strategies
                     currentCoinSymbol = _appSettings.Coins[index];
                 }
 
-                _logger.Information($"Setting initial coin to {currentCoinSymbol}");
+                _logger.Info($"Setting initial coin to {currentCoinSymbol}");
 
                 var currentCoin = new Coin
                 {
@@ -55,11 +55,11 @@ namespace TradeBot.Strategies
 
                 _coinRepository.SaveCurrent(currentCoin);
 
-                _logger.Information($"Purchasing {currentCoinSymbol} to begin trading");
+                _logger.Info($"Purchasing {currentCoinSymbol} to begin trading");
 
                 await _manager.BuyAlt(currentCoin, new Coin(_appSettings.Bridge));
 
-                _logger.Information("Ready to start trading");
+                _logger.Info("Ready to start trading");
             }
         }
     }

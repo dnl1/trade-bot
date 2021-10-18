@@ -14,11 +14,31 @@ namespace TradeBot
 
         public void Debug(string message)
         {
-            string msg = BuildMessage(message, "DEBUG");
+            Log(message, nameof(Debug));
+        }
+
+        public void Error(string message)
+        {
+            Log(message, nameof(Error));
+        }
+
+        public void Info(string message)
+        {
+            Log(message, nameof(Info));
+        }
+
+        public void Warn(string message)
+        {
+            Log(message, nameof(Warn));
+        }
+
+        private void Log(string message, string level)
+        {
+            string msg = BuildMessage(message, level.ToUpper());
             Console.WriteLine(msg);
         }
 
-        private string BuildMessage(string message, string type)
+        private string BuildMessage(string message, string level)
         {
             StringBuilder builder = new();
 
@@ -30,27 +50,9 @@ namespace TradeBot
                     .Append("] - ");
             }
 
-            return builder.Append(type)
+            return builder.Append(level)
             .Append(" - ")
             .Append(message).ToString();
-        }
-
-        public void Error(string message)
-        {
-            string msg = BuildMessage(message, "ERROR");
-            Console.WriteLine(msg);
-        }
-
-        public void Information(string message)
-        {
-            string msg = BuildMessage(message, "INFO");
-            Console.WriteLine(msg);
-        }
-
-        public void Warning(string message)
-        {
-            string msg = BuildMessage(message, "WARN");
-            Console.WriteLine(msg);
         }
     }
 }
