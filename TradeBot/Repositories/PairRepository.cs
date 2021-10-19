@@ -40,5 +40,10 @@ namespace TradeBot.Repositories
         {
             return _database.GetAll().Where(a => a.FromCoin.Symbol.Equals(currentCoin.Symbol));
         }
+
+        public IEnumerable<Pair> GetPairsTo(Coin currentCoin)
+        {
+            return _database.GetAll().Where(a => a.ToCoin.Symbol.Equals(currentCoin.Symbol));
+        }
     }
 }

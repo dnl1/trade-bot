@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Threading;
 using Hangfire;
+using Hangfire.Console;
 using Hangfire.MemoryStorage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +20,12 @@ using TradeBot.Strategies;
 
 IConfiguration? Configuration = null;
 
-Host.CreateDefaultBuilder(args)
+GlobalConfiguration.Configuration.UseMemoryStorage();
+GlobalConfiguration.Configuration.UseConsole();
+
+using (new BackgroundJobServer())
+{
+    Host.CreateDefaultBuilder(args)
     .ConfigureHostConfiguration(builder =>
      {
          builder.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
@@ -29,11 +35,16 @@ Host.CreateDefaultBuilder(args)
      })
     .ConfigureServices(services =>
     {
-        GlobalConfiguration.Configuration.UseMemoryStorage();
         services.AddHostedService<TradingService>();
 
         var appSettings = new AppSettings();
         Configuration.Bind(appSettings);
+
+        services.AddHangfire(config =>
+        {
+            config.UseMemoryStorage();
+            config.UseConsole();
+        });
 
         services.AddSingleton(appSettings);
         services.AddSingleton<BinanceApiManager>();
@@ -44,13 +55,14 @@ Host.CreateDefaultBuilder(args)
         services.AddSingleton<DefaultStrategy>();
         services.AddSingleton<ILogger>(new ConsoleLogger("tradebot-logger"));
         services.AddSingleton(typeof(IDatabase<>), typeof(InMemoryDatabase<>));
+        services.AddSingleton<ICacher, Cacher>();
         services.AddSingleton<ISnapshotRepository, SnapshotRepository>();
         services.AddSingleton<IPairRepository, PairRepository>();
         services.AddSingleton<ICoinRepository, CoinRepository>();
         services.AddSingleton<ITradeRepository, TradeRepository>();
         services.AddSingleton<ITradeService, TradeService>();
 
-        services.AddHttpClient<BinanceApiClient>().AddPolicyHandler(p => 
+        services.AddHttpClient<BinanceApiClient>().AddPolicyHandler(p =>
         HttpPolicyExtensions
         .HandleTransientHttpError()
         .WaitAndRetryAsync(20, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2,
@@ -60,3 +72,4 @@ Host.CreateDefaultBuilder(args)
         Thread.CurrentThread.CurrentCulture = ci;
         Thread.CurrentThread.CurrentUICulture = ci;
     }).Build().Run();
+}

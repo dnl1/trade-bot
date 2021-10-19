@@ -2,7 +2,7 @@
 
 namespace TradeBot
 {
-    internal class TradeFee
+    public class TradeFee
     {
         [JsonProperty("takerCommission")]
         public decimal TakerCommission { get; set; }

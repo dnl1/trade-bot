@@ -10,7 +10,7 @@ using TradeBot.Settings;
 
 namespace TradeBot
 {
-    internal class BinanceApiManager
+    public class BinanceApiManager
     {
         private readonly string _baseUrl;
         private readonly AppSettings _settings;
@@ -35,7 +35,7 @@ namespace TradeBot
             _apiClient = apiClient;
         }
 
-        internal async Task BuyAlt(Coin origin, Coin target)
+        internal async Task<OrderResult> BuyAlt(Coin origin, Coin target)
         {
             _tradeService.StartTradeLog(origin, target, Side.BUY);
 
@@ -45,7 +45,7 @@ namespace TradeBot
             var originBalance = await GetCurrencyBalance(originSymbol);
             var targetBalance = await GetCurrencyBalance(targetSymbol);
 
-            decimal fromCoinPrice = GetTickerPrice(originSymbol + targetSymbol) ?? 0;
+            decimal fromCoinPrice = await GetTickerPrice(originSymbol + targetSymbol) ?? 0m;
 
             double orderQty = await BuyQuantity(originSymbol, targetSymbol, targetBalance, fromCoinPrice);
 
@@ -54,7 +54,7 @@ namespace TradeBot
             if (orderQty == 0)
             {
                 _logger.Warn("Stopping because there's no funds to BUY");
-                return;
+                return null;
             }
 
             OrderResult order = null;
@@ -72,28 +72,135 @@ namespace TradeBot
                 }
             }
 
-            if (order?.OrderId == 0) return;
+            if (order?.OrderId == 0) return null;
 
             var trade = _tradeService.SetOrdered(originBalance, targetBalance, orderQty);
 
-            if (order.Status != OrderStatus.FILLED)
+            if (order?.Status != OrderStatus.FILLED)
             {
                 orderGuard.SetOrder(order.OrderId);
 
                 WaitForOrder(order.OrderId, orderGuard);
             }
 
-
             _logger.Info($"Bought {originSymbol}");
+
+            _tradeService.SetComplete(trade, order.CummulativeQuoteQty);
+
+            return order;
+        }
+
+        internal async Task SellAlt(Coin origin, Coin target)
+        {
+            _tradeService.StartTradeLog(origin, target, Side.SELL);
+
+            string originSymbol = origin.Symbol;
+            string targetSymbol = target.Symbol;
+
+            var originBalance = await GetCurrencyBalance(originSymbol);
+            var targetBalance = await GetCurrencyBalance(targetSymbol);
+
+            decimal fromCoinPrice = await GetTickerPrice(originSymbol + targetSymbol) ?? 0m;
+
+            double orderQty = await SellQuantity(originSymbol, targetSymbol, originBalance);
+
+            if (orderQty == 0)
+            {
+                _logger.Warn("Stopping because there's no STOCK to SELL");
+                return;
+            }
+
+            _logger.Info($"Selling {orderQty} of {originSymbol}");
+
+            _logger.Info($"Balance is {originBalance}");
+
+            OrderResult order = null;
+            var orderGuard = _streamManager.AcquireOrderGuard();
+
+            while (null == order)
+            {
+                try
+                {
+                    order = await _apiClient.OrderLimitSell(originSymbol + targetSymbol, orderQty, fromCoinPrice);
+                }
+                catch (Exception e)
+                {
+                    _logger.Error($"Error at trying to order limit buy {e}");
+                }
+            }
+
+            if (order?.OrderId == 0) return;
+
+            _logger.Info($"SELL ORDER {order}");
+
+            var trade = _tradeService.SetOrdered(originBalance, targetBalance, orderQty);
+
+            if (order?.Status != OrderStatus.FILLED)
+            {
+                orderGuard.SetOrder(order.OrderId);
+
+                WaitForOrder(order.OrderId, orderGuard);
+            }
+
+            decimal newBalance = await GetCurrencyBalance(originSymbol);
+            while (newBalance >= originBalance)
+            {
+                newBalance = await GetCurrencyBalance(originSymbol);
+                Thread.Sleep(1000);
+            }
+
+            _logger.Info($"Sold {originSymbol}");
 
             _tradeService.SetComplete(trade, order.CummulativeQuoteQty);
         }
 
-        internal async Task<decimal> GetFee(Coin fromCoin, Coin targetCoin, bool selling)
+        internal async Task<decimal> GetMinNotional(string symbol, string bridge)
         {
-            var fees = (await _apiClient.GetTradeFee()).ToList();
-            var snapTarget = _snapshotRepository.Get(targetCoin.Symbol);
-            throw new NotImplementedException();
+            var symbolObj = await _apiClient.GetSymbolInfo(symbol + bridge);
+
+            var filter = symbolObj.Filters.Find(a => a.FilterType == "MIN_NOTIONAL");
+
+            return filter.MinNotional;
+        }
+
+        internal async Task<decimal> GetFee(Coin originCoin, Coin targetCoin, bool selling)
+        {
+            var baseFee = (await _apiClient.GetTradeFee()).FirstOrDefault(f => f.Symbol.Equals(originCoin.Symbol + _settings.Bridge)).TakerCommission;
+
+            bool isUsingBnb = await IsUsingBnbForFees();
+
+            if (!isUsingBnb)
+                return baseFee;
+
+            // The discount is only applied if we have enough BNB to cover the fee
+            decimal amountTrading = selling ? (decimal)await BuyQuantity(originCoin.Symbol, targetCoin.Symbol) : (decimal)await SellQuantity(originCoin.Symbol, targetCoin.Symbol);
+
+            decimal feeAmountBnb = 0;
+            decimal feeAmount = amountTrading * baseFee * 0.75m;
+            if (originCoin.Symbol.Equals("BNB"))
+                feeAmountBnb = (decimal)feeAmount;
+            else
+            {
+                var originPrice = await GetTickerPrice(originCoin.Symbol + "BNB");
+                if (originPrice.Value == 0)
+                    return baseFee;
+
+                feeAmountBnb = (decimal)feeAmount * originPrice.Value;
+            }
+
+            var bnbBalance = await GetCurrencyBalance("BNB");
+
+            if (bnbBalance >= feeAmountBnb)
+                return baseFee * 0.75m;
+
+            return baseFee;
+        }
+
+        private async Task<bool> IsUsingBnbForFees()
+        {
+            var bnbBurnResult = await _apiClient.GetBnbBurnSpotMargin();
+
+            return bnbBurnResult.SpotBNBBurn;
         }
 
         private void WaitForOrder(long orderId, OrderGuard orderGuard)
@@ -134,14 +241,23 @@ namespace TradeBot
             mutex.WaitOne();
         }
 
-        private async Task<double> BuyQuantity(string originSymbol, string targetSymbol, decimal? targetBalance, decimal? fromCoinPrice)
+        private async Task<double> BuyQuantity(string originSymbol, string targetSymbol, decimal? targetBalance = null, decimal? fromCoinPrice = null)
         {
             targetBalance = targetBalance ?? (await GetCurrencyBalance(targetSymbol));
-            fromCoinPrice = fromCoinPrice ?? (GetTickerPrice(originSymbol + targetSymbol)) ?? 0;
+            fromCoinPrice = fromCoinPrice ?? (await GetTickerPrice(originSymbol + targetSymbol)) ?? 0;
 
             decimal originTick = await GetAltTick(originSymbol, targetSymbol);
 
             return Math.Floor((double)targetBalance * Math.Pow(10, (double)originTick) / (double)fromCoinPrice) / Math.Pow(10, (double)originTick);
+        }
+
+        private async Task<double> SellQuantity(string originSymbol, string targetSymbol, decimal? originBalance = null)
+        {
+            originBalance = originBalance ?? (await GetCurrencyBalance(originSymbol));
+
+            decimal originTick = await GetAltTick(originSymbol, targetSymbol);
+
+            return Math.Floor((double)originBalance * Math.Pow(10, (double)originTick) / Math.Pow(10, (double)originTick));
         }
 
         private async Task<decimal> GetAltTick(string originSymbol, string targetSymbol)
@@ -156,7 +272,7 @@ namespace TradeBot
             return stepSize.IndexOf('1') - 1;
         }
 
-        private async Task<decimal> GetCurrencyBalance(string targetSymbol)
+        public async Task<decimal> GetCurrencyBalance(string targetSymbol)
         {
             var account = await GetAccount();
 
@@ -168,7 +284,15 @@ namespace TradeBot
             return await _apiClient.GetAccount();
         }
 
-        public decimal? GetTickerPrice(string symbol) => _snapshotRepository.Get(symbol)?.Price;
+        public async Task<decimal?> GetTickerPrice(string symbol)
+        {
+            var response = _snapshotRepository.Get(symbol)?.Price;
 
+            if (response != null) return response;
+
+            var ticker = await _apiClient.GetSymbolTicker(symbol);
+
+            return ticker?.Price;
+        }
     }
 }

@@ -123,7 +123,7 @@ namespace TradeBot.Models
         public string StepSize { get; set; }
 
         [JsonProperty("minNotional", NullValueHandling = NullValueHandling.Ignore)]
-        public string MinNotional { get; set; }
+        public decimal MinNotional { get; set; }
 
         [JsonProperty("applyToMarket", NullValueHandling = NullValueHandling.Ignore)]
         public bool? ApplyToMarket { get; set; }

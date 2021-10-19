@@ -19,7 +19,7 @@ namespace TradeBot.Strategies
             ICoinRepository coinRepository,
             ILogger logger,
             BinanceApiManager manager,
-            AppSettings appSettings) : base(pairRepository, snapshotRepository)
+            AppSettings appSettings) : base(pairRepository, snapshotRepository, appSettings, manager, logger, coinRepository)
         {
             _coinRepository = coinRepository;
             _logger = logger;
@@ -41,7 +41,7 @@ namespace TradeBot.Strategies
 
             _logger.Info($"I am scouting the best trades. Current coin: {currentCoin.Symbol + _appSettings.Bridge} ");
 
-            var currentCoinPrice = _manager.GetTickerPrice(currentCoin.Symbol + _appSettings.Bridge);
+            var currentCoinPrice = _manager.GetTickerPrice(currentCoin.Symbol + _appSettings.Bridge).GetAwaiter().GetResult();
 
             if (!currentCoinPrice.HasValue)
             {
@@ -55,15 +55,27 @@ namespace TradeBot.Strategies
         private async Task JumpToBestCoin(Coin currentCoin, decimal currentCoinPrice)
         {
             Dictionary<Pair, decimal> ratioDict = await GetRatios(currentCoin, currentCoinPrice);
+
+            // keep only ratios bigger than zero
+            var filteredRatioDict = ratioDict.Where(d => d.Value > 0);
+
+            //if we have any viable options, pick the one with the biggest ratio
+
+            if (filteredRatioDict.Any())
+            {
+                var bestPair = filteredRatioDict.OrderByDescending(kvp => kvp.Value).FirstOrDefault().Key;
+                _logger.Info($"Will be jumping from {currentCoin.Symbol} to {bestPair.ToCoin.Symbol}");
+                await TransactionThroughBridge(bestPair);
+            }
         }
 
         private async Task<Dictionary<Pair, decimal>> GetRatios(Coin currentCoin, decimal coinPrice)
         {
             Dictionary<Pair, decimal> ratioDict = new Dictionary<Pair, decimal>();
 
-            foreach (var pair in _pairRepository.GetPairsFrom(new Coin(currentCoin.Symbol + _appSettings.Bridge)))
+            foreach (var pair in _pairRepository.GetPairsFrom(new Coin(currentCoin.Symbol)))
             {
-                var optionalCoinPrice = _manager.GetTickerPrice(pair.ToCoin.Symbol);
+                var optionalCoinPrice = await _manager.GetTickerPrice(pair.ToCoin.Symbol + _appSettings.Bridge);
 
                 if (!optionalCoinPrice.HasValue)
                 {
@@ -76,9 +88,13 @@ namespace TradeBot.Strategies
                 decimal optCoinRatio = coinPrice / optionalCoinPrice.Value;
 
                 decimal transactionFee = (await _manager.GetFee(pair.FromCoin, BRIDGE, true)) + (await _manager.GetFee(pair.FromCoin, BRIDGE, false));
+
+                decimal ratio = (optCoinRatio - transactionFee * _appSettings.ScoutMultiplier * optCoinRatio) - pair.Ratio;
+
+                ratioDict.Add(pair, ratio);
             }
 
-            return null;
+            return ratioDict;
         }
 
         private async Task InitializeCurrentCoin()

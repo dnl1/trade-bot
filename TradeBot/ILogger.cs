@@ -1,6 +1,6 @@
 ﻿namespace TradeBot
 {
-    internal interface ILogger
+    public interface ILogger
     {
         void Warn(string message);
         void Error(string message);

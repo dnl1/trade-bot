@@ -25,7 +25,7 @@ namespace TradeBot
         public long TransactTime { get; set; }
 
         [JsonProperty("price")]
-        public string Price { get; set; }
+        public decimal Price { get; set; }
 
         [JsonProperty("origQty")]
         public string OrigQty { get; set; }
@@ -47,6 +47,11 @@ namespace TradeBot
 
         [JsonProperty("side")]
         public string Side { get; set; }
+
+        public override string ToString()
+        {
+            return JsonConvert.SerializeObject(this);
+        }
     }
 
 }

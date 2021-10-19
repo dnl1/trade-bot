@@ -2,7 +2,7 @@
 
 namespace TradeBot.Repositories
 {
-    internal interface ICoinRepository
+    public interface ICoinRepository
     {
         Coin GetCurrent();
         void SaveCurrent(Coin coin);

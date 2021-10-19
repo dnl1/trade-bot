@@ -43,8 +43,10 @@ namespace TradeBot.HostedServices
 
             strategy.Initialize();
 
-            strategy.Scout();
-            //RecurringJob.AddOrUpdate("scouting", () => strategy.Scout(), "* * * * *");
+            //strategy.Scout();
+            RecurringJob.AddOrUpdate("scouting", () => strategy.Scout(), Cron.Minutely(), timeZone: TimeZoneInfo.Local);
+
+            Thread.Sleep(-1);
         }
 
         public Task StopAsync(CancellationToken cancellationToken)

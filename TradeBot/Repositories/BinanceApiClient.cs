@@ -12,12 +12,15 @@ using TradeBot.Responses;
 using TradeBot.Enums;
 using TradeBot.Models;
 using TradeBot.Settings;
+using Microsoft.Extensions.Caching.Memory;
+using TradeBot.Database;
 
 namespace TradeBot.Repositories
 {
-    internal class BinanceApiClient
+    public class BinanceApiClient
     {
         private readonly HttpClient _httpClient;
+        private readonly ICacher _cacher;
         private readonly bool _testnet = false;
         private readonly string _apiKey;
         private readonly string _apiKeySecret;
@@ -43,11 +46,10 @@ namespace TradeBot.Repositories
 
         private const string FUTURES_API_VERSION = "v1";
 
-
         private const string FUTURES_API_VERSION2 = "v2";
         private const string OPTIONS_API_VERSION = "v1";
 
-        public BinanceApiClient(HttpClient httpClient, AppSettings settings)
+        public BinanceApiClient(HttpClient httpClient, AppSettings settings, ICacher cacher)
         {
             if(settings.ApiKey == null || settings.ApiSecretKey == null)
             {
@@ -55,6 +57,7 @@ namespace TradeBot.Repositories
             }
 
             _httpClient = httpClient;
+            _cacher = cacher;
             _apiKey = settings.ApiKey;
             _apiKeySecret = settings.ApiSecretKey;
             _tld = settings.Tld;
@@ -75,8 +78,16 @@ namespace TradeBot.Repositories
         internal async Task<ListenKeyWrapper> GetListenKey() =>
             await Post<ListenKeyWrapper>("userDataStream", false);
 
+        internal async Task<BnbBurnResult> GetBnbBurnSpotMargin(int ttl = 60) =>
+            await _cacher.ExecuteAsync(async () =>
+                await RequestMarginApi<BnbBurnResult>("get", "bnbBurn", true)
+            , TimeSpan.FromSeconds(ttl));
+
         internal async Task<OrderResult> OrderLimitBuy(string symbol, double orderQty, decimal price) =>
             await OrderLimit(symbol, orderQty, price, Side.BUY);
+
+        internal async Task<OrderResult> OrderLimitSell(string symbol, double orderQty, decimal price) =>
+    await OrderLimit(symbol, orderQty, price, Side.SELL);
 
         private async Task<OrderResult> OrderLimit(string symbol, double orderQty, decimal price, Side side) =>
             await Post<OrderResult>("order", true, data: new Dictionary<string, string>
@@ -95,10 +106,11 @@ namespace TradeBot.Repositories
             return await Get<Account>("account", true, PRIVATE_API_VERSION);
         }
 
-        public async Task<IEnumerable<TradeFee>> GetTradeFee()
-        {
-            return await RequestMarginApi<IEnumerable<TradeFee>>("get", "asset/tradeFee", true);
-        }
+
+        public async Task<IEnumerable<TradeFee>> GetTradeFee(int ttl = 43200) =>
+            await _cacher.ExecuteAsync(async () =>            
+                await RequestMarginApi<IEnumerable<TradeFee>>("get", "asset/tradeFee", true)
+            , TimeSpan.FromSeconds(ttl));
 
         internal async Task<Symbol> GetSymbolInfo(string symbol)
         {
@@ -111,6 +123,16 @@ namespace TradeBot.Repositories
 
         internal async Task<ExchangeInfo> GetExchangeInfo() =>
             await Get<ExchangeInfo>("exchangeInfo", version: PRIVATE_API_VERSION);
+
+        internal async Task<TickerResult> GetSymbolTicker(string symbol)
+        {
+            var dict = new Dictionary<string, string>()
+            {
+                { "symbol", symbol }
+            };
+
+            return await Get<TickerResult>("ticker/price", version: PRIVATE_API_VERSION, data: dict);
+        }
 
         private async Task<T> Get<T>(string path, bool signed = false, string version = PUBLIC_API_VERSION, Dictionary<string, string> data = null)
         {
@@ -163,6 +185,11 @@ namespace TradeBot.Repositories
 
                 requestUrl += $"?{queryString}";
             }
+            else if(data.Any())
+            {
+                string queryString = ExtractQs(data);
+                requestUrl += $"?{queryString}";
+            }
 
             var response = await _httpClient.SendAsync(new HttpRequestMessage(new HttpMethod(method), requestUrl));
 
@@ -192,10 +219,6 @@ namespace TradeBot.Repositories
 
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-            /*_httpClient.DefaultRequestHeaders
-                .UserAgent
-                .Add(new ProductInfoHeaderValue("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36"));*/
 
             if (!string.IsNullOrEmpty(_apiKey))
             {

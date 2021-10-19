@@ -13,7 +13,7 @@ using TradeBot.Settings;
 
 namespace TradeBot
 {
-    internal class BinanceStreamManager
+    public class BinanceStreamManager
     {
         private readonly AppSettings _settings;
         private readonly BinanceApiClient _apiClient;
@@ -87,7 +87,7 @@ namespace TradeBot
                 string rcvMsg = Encoding.UTF8.GetString(msgBytes);
                 var obj = JsonConvert.DeserializeObject<OrderUpdateResult>(rcvMsg);
 
-                if(null != obj && obj.OrderId > 0)
+                if (null != obj && obj.OrderId > 0)
                 {
                     BinanceCache.Orders[obj.OrderId] = obj;
                     _mutexes[obj.OrderId].ReleaseMutex();

@@ -9,5 +9,6 @@ namespace TradeBot.Repositories
         IEnumerable<Pair> GetAll();
         void Save(Pair pair);
         IEnumerable<Pair> GetPairsFrom(Coin currentCoin);
+        IEnumerable<Pair> GetPairsTo(Coin currentCoin);
     }
 }
