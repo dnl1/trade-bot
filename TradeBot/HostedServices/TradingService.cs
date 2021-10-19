@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Hangfire;
+using FluentScheduler;
 using Microsoft.Extensions.Hosting;
 using TradeBot.Factories;
 using TradeBot.Settings;
@@ -15,7 +15,7 @@ namespace TradeBot.HostedServices
         private readonly StrategyFactory _strategyFactory;
         private readonly ILogger _logger;
 
-        public TradingService(AppSettings settings, 
+        public TradingService(AppSettings settings,
             MarketDataListenerService marketDataListenerService,
             StrategyFactory strategyFactory,
             ILogger logger)
@@ -43,10 +43,7 @@ namespace TradeBot.HostedServices
 
             strategy.Initialize();
 
-            //strategy.Scout();
-            RecurringJob.AddOrUpdate("scouting", () => strategy.Scout(), Cron.Minutely(), timeZone: TimeZoneInfo.Local);
-
-            Thread.Sleep(-1);
+            JobManager.AddJob(() => strategy.Scout(), s => s.ToRunEvery(_settings.ScoutSleepTime).Minutes());
         }
 
         public Task StopAsync(CancellationToken cancellationToken)

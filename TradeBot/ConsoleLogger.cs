@@ -14,22 +14,27 @@ namespace TradeBot
 
         public void Debug(string message)
         {
+            Console.ForegroundColor = ConsoleColor.DarkGray;
             Log(message, nameof(Debug));
         }
 
         public void Error(string message)
         {
+            Console.ForegroundColor = ConsoleColor.DarkRed;
             Log(message, nameof(Error));
         }
 
         public void Info(string message)
         {
+            Console.ForegroundColor = ConsoleColor.DarkGreen;
             Log(message, nameof(Info));
         }
 
         public void Warn(string message)
         {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
             Log(message, nameof(Warn));
+
         }
 
         private void Log(string message, string level)

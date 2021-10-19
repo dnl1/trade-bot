@@ -12,7 +12,6 @@ using TradeBot.Responses;
 using TradeBot.Enums;
 using TradeBot.Models;
 using TradeBot.Settings;
-using Microsoft.Extensions.Caching.Memory;
 using TradeBot.Database;
 
 namespace TradeBot.Repositories

@@ -1,4 +1,4 @@
-﻿using Hangfire;
+﻿using FluentScheduler;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -71,9 +71,7 @@ namespace TradeBot
         {
             var listenKey = await _apiClient.GetListenKey();
 
-            RecurringJob.AddOrUpdate(
-                "keep-listen-key-alive",
-                () => _apiClient.GetListenKey().Wait(), "*/30 * * * *");
+            JobManager.AddJob(() => _apiClient.GetListenKey().Wait(),s => s.ToRunEvery(30).Minutes());
 
             ClientWebSocket socket = await UserStreamCreateSocket(listenKey.ListenKey);
 

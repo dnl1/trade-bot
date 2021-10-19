@@ -8,6 +8,7 @@
         public string Tld { get; set; }
         public string CurrentCoin { get; set; }
         public decimal ScoutMultiplier { get; set; }
+        public int ScoutSleepTime{ get; set; }
         public string Strategy { get; set; }
         public string[] Coins { get; set; }
     }
