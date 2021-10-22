@@ -50,7 +50,7 @@ namespace TradeBot.Repositories
 
         public BinanceApiClient(HttpClient httpClient, AppSettings settings, ICacher cacher)
         {
-            if(settings.ApiKey == null || settings.ApiSecretKey == null)
+            if(string.IsNullOrEmpty(settings.ApiKey)|| string.IsNullOrEmpty(settings.ApiSecretKey))
             {
                 throw new KeyNotFoundException("ApiKey or ApiSecretKey not populated");
             }

@@ -19,6 +19,7 @@ namespace TradeBot
         private readonly BinanceApiClient _apiClient;
         private readonly string _baseUrl;
         private readonly Dictionary<string, int> _pendingOrders;
+        private readonly CancellationToken _cancellationToken;
         private readonly Dictionary<long, Mutex> _mutexes;
 
         public BinanceStreamManager(AppSettings settings, BinanceApiClient binanceApiClient)
@@ -26,6 +27,7 @@ namespace TradeBot
             _settings = settings;
             _apiClient = binanceApiClient;
             _baseUrl = "wss://stream.binance.com:9443/ws";
+            _cancellationToken = new CancellationTokenSource(5000).Token;
 
             _mutexes = new Dictionary<long, Mutex>();
             _pendingOrders = new Dictionary<string, int>();
@@ -35,7 +37,7 @@ namespace TradeBot
         {
             Task.Factory.StartNew<Task>(async () =>
             {
-                ClientWebSocket socket = await CreateSocket(cancellationToken);
+                ClientWebSocket socket = await CreateSocket();
 
                 object payload = new
                 {
@@ -97,16 +99,17 @@ namespace TradeBot
         {
             var socket = new ClientWebSocket();
 
+            
             string url = $"{_baseUrl}/{listenKey}";
-            await socket.ConnectAsync(new Uri(url), new CancellationToken());
+            await socket.ConnectAsync(new Uri(url), _cancellationToken);
             return socket;
         }
 
-        private async Task<ClientWebSocket> CreateSocket(CancellationToken cancellationToken)
+        private async Task<ClientWebSocket> CreateSocket()
         {
             var socket = new ClientWebSocket();
 
-            await socket.ConnectAsync(new Uri($"{_baseUrl}"), cancellationToken);
+            await socket.ConnectAsync(new Uri($"{_baseUrl}"), _cancellationToken);
             return socket;
         }
 

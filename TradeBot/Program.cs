@@ -1,7 +1,4 @@
-﻿using System;
-using System.Globalization;
-using System.Threading;
-using FluentScheduler;
+﻿using FluentScheduler;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -9,6 +6,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http;
 using Polly;
 using Polly.Extensions.Http;
+using System;
+using System.Globalization;
+using System.Threading;
 using TradeBot;
 using TradeBot.Database;
 using TradeBot.Factories;
@@ -18,50 +18,56 @@ using TradeBot.Services;
 using TradeBot.Settings;
 using TradeBot.Strategies;
 
-IConfiguration? Configuration = null;
-
-Host.CreateDefaultBuilder(args)
-.ConfigureHostConfiguration(builder =>
- {
-     builder.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-         .AddEnvironmentVariables();
-
-     Configuration = builder.Build();
- })
-.ConfigureServices(services =>
+public class Program
 {
-    services.AddHostedService<TradingService>();
+    private static IConfiguration? Configuration = null;
 
-    var appSettings = new AppSettings();
-    Configuration.Bind(appSettings);
+    public static void Main(string[] args)
+    {
+        Host.CreateDefaultBuilder(args)
+            .ConfigureHostConfiguration(builder =>
+            {
+                builder.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                    .AddEnvironmentVariables();
 
-    JobManager.Initialize();
+                Configuration = builder.Build();
+            })
+            .ConfigureServices(services =>
+            {
+                services.AddHostedService<TradingService>();
 
-    services.AddSingleton(appSettings);
-    services.AddSingleton<BinanceApiManager>();
-    services.AddSingleton<BinanceStreamManager>();
-    services.AddSingleton<BinanceApiClient>();
-    services.AddSingleton<MarketDataListenerService>();
-    services.AddSingleton<StrategyFactory>();
-    services.AddSingleton<DefaultStrategy>();
-    services.AddSingleton<ILogger>(new ConsoleLogger("tradebot-logger"));
-    services.AddSingleton(typeof(IDatabase<>), typeof(InMemoryDatabase<>));
-    services.AddSingleton<ICacher, Cacher>();
-    services.AddSingleton<ISnapshotRepository, SnapshotRepository>();
-    services.AddSingleton<IPairRepository, PairRepository>();
-    services.AddSingleton<ICoinRepository, CoinRepository>();
-    services.AddSingleton<ITradeRepository, TradeRepository>();
-    services.AddSingleton<ITradeService, TradeService>();
+                var appSettings = new AppSettings();
+                Configuration.Bind(appSettings);
 
-    services.AddHttpClient<BinanceApiClient>().AddPolicyHandler(p =>
-    HttpPolicyExtensions
-    .HandleTransientHttpError()
-    .WaitAndRetryAsync(20, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2,
-                                                                retryAttempt))));
+                JobManager.Initialize();
 
-    services.RemoveAll<IHttpMessageHandlerBuilderFilter>();
+                services.AddSingleton(appSettings);
+                services.AddSingleton<BinanceApiManager>();
+                services.AddSingleton<BinanceStreamManager>();
+                services.AddSingleton<BinanceApiClient>();
+                services.AddSingleton<MarketDataListenerService>();
+                services.AddSingleton<StrategyFactory>();
+                services.AddSingleton<DefaultStrategy>();
+                services.AddSingleton<ILogger>(new ConsoleLogger("tradebot-logger"));
+                services.AddSingleton(typeof(IDatabase<>), typeof(InMemoryDatabase<>));
+                services.AddSingleton<ICacher, Cacher>();
+                services.AddSingleton<ISnapshotRepository, SnapshotRepository>();
+                services.AddSingleton<IPairRepository, PairRepository>();
+                services.AddSingleton<ICoinRepository, CoinRepository>();
+                services.AddSingleton<ITradeRepository, TradeRepository>();
+                services.AddSingleton<ITradeService, TradeService>();
 
-    CultureInfo ci = new CultureInfo("en-US");
-    Thread.CurrentThread.CurrentCulture = ci;
-    Thread.CurrentThread.CurrentUICulture = ci;
-}).Build().Run();
+                services.AddHttpClient<BinanceApiClient>().AddPolicyHandler(p =>
+                    HttpPolicyExtensions
+                        .HandleTransientHttpError()
+                        .WaitAndRetryAsync(20, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2,
+                            retryAttempt))));
+
+                services.RemoveAll<IHttpMessageHandlerBuilderFilter>();
+
+                CultureInfo ci = new CultureInfo("en-US");
+                Thread.CurrentThread.CurrentCulture = ci;
+                Thread.CurrentThread.CurrentUICulture = ci;
+            }).Build().Run();
+    }
+}

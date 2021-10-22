@@ -41,6 +41,8 @@ namespace TradeBot
         {
             string msg = BuildMessage(message, level.ToUpper());
             Console.WriteLine(msg);
+            Console.ForegroundColor = ConsoleColor.Gray;
+
         }
 
         private string BuildMessage(string message, string level)

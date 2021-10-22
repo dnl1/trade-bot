@@ -1,4 +1,7 @@
 ﻿
+using System;
+using System.Threading.Tasks;
+
 namespace TradeBot.Database
 {
     public interface ICacher
