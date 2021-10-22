@@ -51,52 +51,23 @@ namespace TradeBot.Strategies
                 return;
             }
 
-            await JumpToBestCoin(currentCoin, currentCoinPrice.GetValueOrDefault());
+            await base.JumpToBestCoin(currentCoin, currentCoinPrice.GetValueOrDefault());
         }
 
-        private async Task JumpToBestCoin(Coin currentCoin, decimal currentCoinPrice)
+        public override async Task<Coin?> BridgeScout()
         {
-            Dictionary<Pair, decimal> ratioDict = await GetRatios(currentCoin, currentCoinPrice);
+            var currentCoin = _coinRepository.GetCurrent();
+            var coinBalance = await _manager.GetCurrencyBalance(currentCoin.Symbol);
+            var minNotional = await _manager.GetMinNotional(currentCoin.Symbol, _appSettings.Bridge);
 
-            // keep only ratios bigger than zero
-            var filteredRatioDict = ratioDict.Where(d => d.Value > 0);
+            if (coinBalance > minNotional) return null;
 
-            //if we have any viable options, pick the one with the biggest ratio
+            var newCoin = await base.BridgeScout();
 
-            if (filteredRatioDict.Any())
-            {
-                var bestPair = filteredRatioDict.OrderByDescending(kvp => kvp.Value).FirstOrDefault().Key;
-                _logger.Info($"Will be jumping from {currentCoin.Symbol} to {bestPair.ToCoin.Symbol}");
-                await TransactionThroughBridge(bestPair);
-            }
-        }
+            if(null != newCoin)
+                _coinRepository.SaveCurrent(newCoin);
 
-        private async Task<Dictionary<Pair, decimal>> GetRatios(Coin currentCoin, decimal coinPrice)
-        {
-            Dictionary<Pair, decimal> ratioDict = new Dictionary<Pair, decimal>();
-
-            foreach (var pair in _pairRepository.GetPairsFrom(new Coin(currentCoin.Symbol)))
-            {
-                var optionalCoinPrice = await _manager.GetTickerPrice(pair.ToCoin.Symbol + _appSettings.Bridge);
-
-                if (!optionalCoinPrice.HasValue)
-                {
-                    _logger.Warn($"Skipping scouting... optional coin {pair.ToCoin.Symbol} not found");
-                    continue;
-                }
-
-                // db log scout
-
-                decimal optCoinRatio = coinPrice / optionalCoinPrice.Value;
-
-                decimal transactionFee = (await _manager.GetFee(pair.FromCoin, BRIDGE, true)) + (await _manager.GetFee(pair.FromCoin, BRIDGE, false));
-
-                decimal ratio = (optCoinRatio - transactionFee * _appSettings.ScoutMultiplier * optCoinRatio) - pair.Ratio;
-
-                ratioDict.Add(pair, ratio);
-            }
-
-            return ratioDict;
+            return null;
         }
 
         private async Task InitializeCurrentCoin()
