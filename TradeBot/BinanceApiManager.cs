@@ -229,15 +229,9 @@ namespace TradeBot
                 order = BinanceCache.Orders[orderId];
 
                 _logger.Debug($"Waiting for order {orderId} to be filled");
-
-                //long orderId = obj?.OrderId ?? 0;
-                //if (_mutexes.ContainsKey(orderId))
-                //{
-                //    _mutexes[orderId].ReleaseMutex();
-                //}
             }
 
-            //_logger.debug($"Order filled: {order_status}")
+            _logger.Debug($"Order filled: {order.OrderId}");
 
 
             mutex.WaitOne();

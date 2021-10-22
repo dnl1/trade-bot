@@ -13,6 +13,7 @@ using TradeBot;
 using TradeBot.Database;
 using TradeBot.Factories;
 using TradeBot.HostedServices;
+using TradeBot.Providers;
 using TradeBot.Repositories;
 using TradeBot.Services;
 using TradeBot.Settings;
@@ -49,7 +50,7 @@ public class Program
                 services.AddSingleton<StrategyFactory>();
                 services.AddSingleton<DefaultStrategy>();
                 services.AddSingleton<MultipleCoinsStrategy>();
-                services.AddSingleton<ILogger>(new ConsoleLogger("tradebot-logger"));
+                services.AddSingleton<ILogger>(sp => new ConsoleLogger(sp.GetService<INotificationService>(), "tradebot-logger"));
                 services.AddSingleton(typeof(IDatabase<>), typeof(InMemoryDatabase<>));
                 services.AddSingleton<ICacher, Cacher>();
                 services.AddSingleton<ISnapshotRepository, SnapshotRepository>();
@@ -57,6 +58,14 @@ public class Program
                 services.AddSingleton<ICoinRepository, CoinRepository>();
                 services.AddSingleton<ITradeRepository, TradeRepository>();
                 services.AddSingleton<ITradeService, TradeService>();
+
+                services.AddSingleton<TelegramProvider>();
+                services.AddSingleton<IEnumerable<INotificationProvider>>(sp =>
+                {
+                    var provider = sp.GetService<TelegramProvider>();
+                    return new[] { provider };
+                });
+                services.AddSingleton<INotificationService, NotificationService>();
 
                 services.AddHttpClient<BinanceApiClient>().AddPolicyHandler(p =>
                     HttpPolicyExtensions

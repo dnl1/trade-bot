@@ -7,6 +7,7 @@
         public string Bridge { get; set; }
         public string Tld { get; set; }
         public string CurrentCoin { get; set; }
+        public string TelegramBotId { get; set; }
         public decimal ScoutMultiplier { get; set; }
         public int ScoutSleepTime{ get; set; }
         public string Strategy { get; set; }

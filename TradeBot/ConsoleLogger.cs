@@ -1,14 +1,17 @@
 ﻿using System;
 using System.Text;
+using TradeBot.Services;
 
 namespace TradeBot
 {
     internal class ConsoleLogger : ILogger
     {
         private readonly string _loggingService;
+        private readonly INotificationService _notificationService;
 
-        public ConsoleLogger(string loggingService = "")
+        public ConsoleLogger(INotificationService notificationService, string loggingService = "")
         {
+            _notificationService = notificationService;
             _loggingService = loggingService;
         }
 
@@ -56,6 +59,8 @@ namespace TradeBot
                     .Append(_loggingService)
                     .Append("] - ");
             }
+
+            _notificationService.Notify(message).ConfigureAwait(false);
 
             return builder.Append(level)
             .Append(" - ")
