@@ -31,19 +31,19 @@ namespace TradeBot.Strategies
             BRIDGE = new Coin(appSettings.Bridge);
         }
 
-        public override void Initialize()
+        public override async Task Initialize()
         {
-            base.Initialize();
-            InitializeCurrentCoin().Wait();
+            await base.Initialize();
+            await InitializeCurrentCoin();
         }
 
-        public override void Scout()
+        public override async Task Scout()
         {
             var currentCoin = _coinRepository.GetCurrent();
 
             _logger.Info($"I am scouting the best trades. Current coin: {currentCoin.Symbol + _appSettings.Bridge} ");
 
-            var currentCoinPrice = _manager.GetTickerPrice(currentCoin.Symbol + _appSettings.Bridge).GetAwaiter().GetResult();
+            var currentCoinPrice = await _manager.GetTickerPrice(currentCoin.Symbol + _appSettings.Bridge);
 
             if (!currentCoinPrice.HasValue)
             {
@@ -51,7 +51,7 @@ namespace TradeBot.Strategies
                 return;
             }
 
-            JumpToBestCoin(currentCoin, currentCoinPrice.GetValueOrDefault()).Wait();
+            await JumpToBestCoin(currentCoin, currentCoinPrice.GetValueOrDefault());
         }
 
         private async Task JumpToBestCoin(Coin currentCoin, decimal currentCoinPrice)

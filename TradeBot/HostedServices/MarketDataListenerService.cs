@@ -45,11 +45,10 @@ namespace TradeBot.HostedServices
             {
                 _snapshotRepository.Save(snapshot);
 
-                if (dict[snapshot.Symbol])
-                {
-                    _countdown.Signal();
-                    dict[snapshot.Symbol] = false;
-                }
+                if (!dict[snapshot.Symbol]) return;
+
+                _countdown.Signal();
+                dict[snapshot.Symbol] = false;
             }, cancellationToken);
 
             return Task.CompletedTask;

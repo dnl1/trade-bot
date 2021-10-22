@@ -41,9 +41,9 @@ namespace TradeBot.HostedServices
 
             _marketDataListenerService.GetCountdownEvent().Wait();
 
-            strategy.Initialize();
+            await strategy.Initialize();
 
-            JobManager.AddJob(() => strategy.Scout(), s => s.ToRunEvery(_settings.ScoutSleepTime).Minutes());
+            JobManager.AddJob(async () => await strategy.Scout(), s => s.ToRunEvery(_settings.ScoutSleepTime).Minutes());
         }
 
         public Task StopAsync(CancellationToken cancellationToken)

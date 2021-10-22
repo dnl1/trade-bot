@@ -33,12 +33,14 @@ namespace TradeBot.Strategies
             BRIDGE = new Coin(appSettings.Bridge);
         }
 
-        public virtual void Initialize()
+        public virtual Task Initialize()
         {
             InitializeTradeThresholds();
+
+            return Task.CompletedTask;
         }
 
-        public virtual void Scout()
+        public virtual Task Scout()
         {
             throw new NotImplementedException();
         }

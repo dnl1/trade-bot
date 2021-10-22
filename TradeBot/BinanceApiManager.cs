@@ -59,7 +59,7 @@ namespace TradeBot
                 return null;
             }
 
-            OrderResult order = null;
+            OrderResult? order = null;
             var orderGuard = _streamManager.AcquireOrderGuard();
 
             while (null == order)
