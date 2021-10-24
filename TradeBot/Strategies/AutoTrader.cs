@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using TradeBot.Entities;
 using TradeBot.Repositories;
 using TradeBot.Settings;
+using System.Collections.Generic;
 
 namespace TradeBot.Strategies
 {

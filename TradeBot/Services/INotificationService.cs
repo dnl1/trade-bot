@@ -1,4 +1,6 @@
 ﻿
+using System.Threading.Tasks;
+
 namespace TradeBot.Services
 {
     internal interface INotificationService
