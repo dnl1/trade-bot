@@ -8,6 +8,7 @@ using Polly;
 using Polly.Extensions.Http;
 using System;
 using System.Globalization;
+using System.Collections.Generic;
 using System.Threading;
 using TradeBot;
 using TradeBot.Database;
