@@ -50,7 +50,7 @@ public class Program
                 services.AddSingleton<StrategyFactory>();
                 services.AddSingleton<DefaultStrategy>();
                 services.AddSingleton<MultipleCoinsStrategy>();
-                services.AddSingleton<ILogger>(sp => new ConsoleLogger(sp.GetService<INotificationService>(), "tradebot-logger"));
+                services.AddSingleton<ILogger>(sp => new ConsoleLogger((msg) => sp.GetService<INotificationService>()?.Notify(msg), "tradebot-logger"));
                 services.AddSingleton(typeof(IDatabase<>), typeof(InMemoryDatabase<>));
                 services.AddSingleton<ICacher, Cacher>();
                 services.AddSingleton<ISnapshotRepository, SnapshotRepository>();

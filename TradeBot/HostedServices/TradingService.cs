@@ -54,7 +54,7 @@ namespace TradeBot.HostedServices
             _logger.Info($"Chosen strategy: {_settings.Strategy}");
 
             _logger.Info("Waiting for snapshots to load");
-            _marketDataListenerService.GetCountdownEvent().Wait();
+            _marketDataListenerService.Wait();
             _logger.Info("Snapshots loaded with success");
 
             await strategy.Initialize();

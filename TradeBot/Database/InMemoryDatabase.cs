@@ -4,8 +4,8 @@ namespace TradeBot.Database
 {
     internal class InMemoryDatabase<T> : IDatabase<T> where T : class
     {
-        public Dictionary<string, T> Db { get; set; }
-        private object _locker;
+        private Dictionary<string, T> Db { get; set; }
+        private readonly object _locker;
 
         public InMemoryDatabase()
         {

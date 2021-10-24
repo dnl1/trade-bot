@@ -175,7 +175,7 @@ namespace TradeBot
                 return baseFee;
 
             // The discount is only applied if we have enough BNB to cover the fee
-            decimal amountTrading = selling ? (decimal)await BuyQuantity(originCoin.Symbol, targetCoin.Symbol) : (decimal)await SellQuantity(originCoin.Symbol, targetCoin.Symbol);
+            decimal amountTrading = selling ? (decimal)await SellQuantity(originCoin.Symbol, targetCoin.Symbol) : (decimal)await BuyQuantity(originCoin.Symbol, targetCoin.Symbol);
 
             decimal feeAmountBnb = 0;
             decimal feeAmount = amountTrading * baseFee * 0.75m;
@@ -244,7 +244,7 @@ namespace TradeBot
 
             decimal originTick = await GetAltTick(originSymbol, targetSymbol);
 
-            return Math.Floor((double)targetBalance * Math.Pow(10, (double)originTick) / (double)fromCoinPrice) / Math.Pow(10, (double)originTick);
+            return Math.Floor((double) targetBalance * Math.Pow(10, (double)originTick) / (double) fromCoinPrice) / Math.Pow(10, (double)originTick);
         }
 
         private async Task<double> SellQuantity(string originSymbol, string targetSymbol, decimal? originBalance = null)
@@ -253,7 +253,7 @@ namespace TradeBot
 
             decimal originTick = await GetAltTick(originSymbol, targetSymbol);
 
-            return Math.Floor((double)originBalance * Math.Pow(10, (double)originTick) / Math.Pow(10, (double)originTick));
+            return Math.Floor((double)originBalance * Math.Pow(10, (double)originTick)) / Math.Pow(10, (double)originTick);
         }
 
         private async Task<decimal> GetAltTick(string originSymbol, string targetSymbol)
@@ -282,9 +282,9 @@ namespace TradeBot
 
         public async Task<decimal?> GetTickerPrice(string symbol)
         {
-            var response = _snapshotRepository.Get(symbol)?.Price;
+            //var response = _snapshotRepository.Get(symbol)?.Price;
 
-            if (response != null) return response;
+            //if (response != null) return response;
 
             var ticker = await _apiClient.GetSymbolTicker(symbol);
 

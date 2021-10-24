@@ -54,6 +54,6 @@ namespace TradeBot.HostedServices
             return Task.CompletedTask;
         }
 
-        public CountdownEvent GetCountdownEvent() => _countdown;
+        public void Wait() => _countdown.Wait();
     }
 }

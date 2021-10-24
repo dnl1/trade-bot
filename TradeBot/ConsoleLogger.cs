@@ -6,12 +6,12 @@ namespace TradeBot
 {
     internal class ConsoleLogger : ILogger
     {
+        private readonly Action<string>? _postLog;
         private readonly string _loggingService;
-        private readonly INotificationService _notificationService;
 
-        public ConsoleLogger(INotificationService notificationService, string loggingService = "")
+        public ConsoleLogger(Action<string>? postLog = null, string loggingService = "")
         {
-            _notificationService = notificationService;
+            _postLog = postLog;
             _loggingService = loggingService;
         }
 
@@ -46,6 +46,9 @@ namespace TradeBot
             Console.WriteLine(msg);
             Console.ForegroundColor = ConsoleColor.Gray;
 
+            if (null != _postLog)
+                _postLog(message);
+
         }
 
         private string BuildMessage(string message, string level)
@@ -59,8 +62,6 @@ namespace TradeBot
                     .Append(_loggingService)
                     .Append("] - ");
             }
-
-            _notificationService.Notify(message).ConfigureAwait(false);
 
             return builder.Append(level)
             .Append(" - ")

@@ -89,6 +89,7 @@ namespace TradeBot.Strategies
             {
                 try
                 {
+                    _logger.Info($"Selling {pair.FromCoin.Symbol}");
                     await _manager.SellAlt(pair.FromCoin, BRIDGE);
                 }
                 catch (Exception e)
@@ -131,7 +132,7 @@ namespace TradeBot.Strategies
         {
             Dictionary<Pair, decimal> ratioDict = new Dictionary<Pair, decimal>();
 
-            foreach (var pair in _pairRepository.GetPairsFrom(new Coin(currentCoin.Symbol)))
+            foreach (var pair in _pairRepository.GetPairsFrom(currentCoin))
             {
                 var optionalCoinPrice = await _manager.GetTickerPrice(pair.ToCoin.Symbol + _appSettings.Bridge);
 
@@ -145,7 +146,7 @@ namespace TradeBot.Strategies
 
                 decimal optCoinRatio = coinPrice / optionalCoinPrice.Value;
 
-                decimal transactionFee = (await _manager.GetFee(pair.FromCoin, BRIDGE, true)) + (await _manager.GetFee(pair.FromCoin, BRIDGE, false));
+                decimal transactionFee = (await _manager.GetFee(pair.FromCoin, BRIDGE, true)) + (await _manager.GetFee(pair.ToCoin, BRIDGE, false));
 
                 decimal ratio = (optCoinRatio - transactionFee * _appSettings.ScoutMultiplier * optCoinRatio) - pair.Ratio;
 

@@ -25,7 +25,7 @@ namespace TradeBot.Providers
 
         public async Task SendMessage(string msg)
         {
-            var msgRet = await _client.SendTextMessageAsync(new Telegram.Bot.Types.ChatId(_identifier), msg);
+            await _client.SendTextMessageAsync(new Telegram.Bot.Types.ChatId(_identifier), msg);
         }
     }
 }
