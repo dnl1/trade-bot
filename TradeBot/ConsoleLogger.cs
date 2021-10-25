@@ -43,10 +43,10 @@ namespace TradeBot
         private void Log(string message, string level)
         {
             string msg = BuildMessage(message, level.ToUpper());
-            Console.WriteLine(msg);
+            Console.WriteLine(DateTime.Now.ToString("HH:mm:ss") + " - " + msg);
             Console.ForegroundColor = ConsoleColor.Gray;
 
-            if (null != _postLog)
+            if (null != _postLog)                                                   
                 _postLog(message);
 
         }

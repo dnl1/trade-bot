@@ -7,22 +7,28 @@ namespace TradeBot
     internal class OrderGuard
     {
         private Dictionary<string, int> _pendingOrders;
-        private readonly Dictionary<long, Mutex> _slimOrder;
+        private readonly Dictionary<long, ManualResetEventSlim> _mutexes;
 
-        public OrderGuard(Dictionary<string, int> pendingOrders, Dictionary<long, Mutex> slimOrder)
+        public OrderGuard(Dictionary<string, int> pendingOrders, Dictionary<long, ManualResetEventSlim> mutexes)
         {
             _pendingOrders = pendingOrders;
-            _slimOrder = slimOrder;
+            _mutexes = mutexes;
         }
 
         internal void SetOrder(long orderId)
         {
-            _slimOrder.Add(orderId, new Mutex());
+            _mutexes.Add(orderId, new ManualResetEventSlim(false));
         }
 
-        internal Mutex GetMutex(long orderId)
+        internal ManualResetEventSlim GetMutex(long orderId)
         {
-            return _slimOrder[orderId];
+            return _mutexes[orderId];
+        }
+
+        internal void Wait(long orderId)
+        {
+            if(_mutexes.ContainsKey(orderId))
+                _mutexes[orderId].Wait();
         }
     }
 }

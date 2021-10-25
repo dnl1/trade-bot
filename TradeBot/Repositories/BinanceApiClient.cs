@@ -13,6 +13,7 @@ using TradeBot.Enums;
 using TradeBot.Models;
 using TradeBot.Settings;
 using TradeBot.Database;
+using System.Globalization;
 
 namespace TradeBot.Repositories
 {
@@ -86,14 +87,14 @@ namespace TradeBot.Repositories
             await OrderLimit(symbol, orderQty, price, Side.BUY);
 
         internal async Task<OrderResult> OrderLimitSell(string symbol, double orderQty, decimal price) =>
-    await OrderLimit(symbol, orderQty, price, Side.SELL);
+            await OrderLimit(symbol, orderQty, price, Side.SELL);
 
         private async Task<OrderResult> OrderLimit(string symbol, double orderQty, decimal price, Side side) =>
             await Post<OrderResult>("order", true, data: new Dictionary<string, string>
             {
                 { "symbol", symbol },
-                { "quantity", orderQty.ToString() },
-                { "price", price.ToString() },
+                { "quantity", orderQty.ToString(CultureInfo.InvariantCulture) },
+                { "price", price.ToString(CultureInfo.InvariantCulture) },
                 { "side", side == Side.BUY ? "BUY" : "SELL" },
                 { "type", "LIMIT" },
                 { "timeInForce", "GTC" }
@@ -133,6 +134,38 @@ namespace TradeBot.Repositories
             return await Get<TickerResult>("ticker/price", version: PRIVATE_API_VERSION, data: dict);
         }
 
+        internal async Task<OrderResult> OrderMarketSell(string symbol, double quantity)
+        {
+            var dict = new Dictionary<string, string>()
+            {
+                { "symbol", symbol },
+                { "quantity", quantity.ToString(CultureInfo.InvariantCulture) },
+                { "side", "SELL" }
+            };
+
+            return await OrderMarket(dict);
+
+        }
+
+        private async Task<OrderResult> OrderMarket(Dictionary<string, string> dict)
+        {
+            dict.Add("type", "MARKET");
+            dict.Add("timeInForce", "GTC");
+
+            return await Post<OrderResult>("order", true, data: dict);
+        }
+
+        internal async Task<OrderCancelResult> CancelOrder(string symbol, long orderId)
+        {
+            var dict = new Dictionary<string, string>()
+            {
+                { "symbol", symbol },
+                { "orderId", orderId.ToString() }
+            };
+
+            return await Delete<OrderCancelResult>("order", version: PRIVATE_API_VERSION, data: dict);
+        }
+
         private async Task<T> Get<T>(string path, bool signed = false, string version = PUBLIC_API_VERSION, Dictionary<string, string> data = null)
         {
             data ??= new Dictionary<string, string>();
@@ -140,6 +173,15 @@ namespace TradeBot.Repositories
             string url = CreateApiUri(path, signed, version);
 
             return await Request<T>("GET", url, signed, data);
+        }
+
+        private async Task<T> Delete<T>(string path, bool signed = false, string version = PUBLIC_API_VERSION, Dictionary<string, string> data = null)
+        {
+            data ??= new Dictionary<string, string>();
+
+            string url = CreateApiUri(path, signed, version);
+
+            return await Request<T>("DELETE", url, signed, data);
         }
 
         private async Task<T> Post<T>(string path, bool signed = false, string version = PUBLIC_API_VERSION, Dictionary<string, string> data = null)

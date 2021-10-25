@@ -37,7 +37,7 @@ namespace TradeBot
             _apiClient = apiClient;
         }
 
-        internal async Task<OrderResult> BuyAlt(Coin origin, Coin target)
+        internal async Task<OrderUpdateResult> BuyAlt(Coin origin, Coin target)
         {
             _tradeService.StartTradeLog(origin, target, Side.BUY);
 
@@ -78,21 +78,20 @@ namespace TradeBot
 
             var trade = _tradeService.SetOrdered(originBalance, targetBalance, orderQty);
 
-            if (order?.Status != OrderStatus.FILLED)
-            {
-                orderGuard.SetOrder(order.OrderId);
+            orderGuard.SetOrder(order.OrderId);
 
-                WaitForOrder(order.OrderId, orderGuard);
-            }
+            var waitedOrder = await WaitForOrder(order.OrderId, orderGuard, originSymbol, targetSymbol);
+
+            if (null == waitedOrder) return null;
 
             _logger.Info($"Bought {originSymbol}");
 
-            _tradeService.SetComplete(trade, order.CummulativeQuoteQty);
+            _tradeService.SetComplete(trade, waitedOrder.CumQuoteAssetTransactedQty);
 
-            return order;
+            return waitedOrder;
         }
 
-        internal async Task SellAlt(Coin origin, Coin target)
+        internal async Task<OrderResult> SellAlt(Coin origin, Coin target)
         {
             _tradeService.StartTradeLog(origin, target, Side.SELL);
 
@@ -109,7 +108,7 @@ namespace TradeBot
             if (orderQty == 0)
             {
                 _logger.Warn("Stopping because there's no STOCK to SELL");
-                return;
+                return null;
             }
 
             _logger.Info($"Selling {orderQty} of {originSymbol}");
@@ -127,22 +126,22 @@ namespace TradeBot
                 }
                 catch (Exception e)
                 {
-                    _logger.Error($"Error at trying to order limit buy {e}");
+                    _logger.Error($"Error at trying to order limit sell {e}");
+                    return null;
                 }
             }
 
-            if (order?.OrderId == 0) return;
+            if (order?.OrderId == 0) return null;
 
             _logger.Info($"SELL ORDER {order}");
 
             var trade = _tradeService.SetOrdered(originBalance, targetBalance, orderQty);
 
-            if (order?.Status != OrderStatus.FILLED)
-            {
-                orderGuard.SetOrder(order.OrderId);
+            orderGuard.SetOrder(order.OrderId);
 
-                WaitForOrder(order.OrderId, orderGuard);
-            }
+            var waitedOrder = await WaitForOrder(order.OrderId, orderGuard, originSymbol, targetSymbol);
+
+            if (null == waitedOrder) return null;
 
             decimal newBalance = await GetCurrencyBalance(originSymbol);
             while (newBalance >= originBalance)
@@ -154,6 +153,8 @@ namespace TradeBot
             _logger.Info($"Sold {originSymbol}");
 
             _tradeService.SetComplete(trade, order.CummulativeQuoteQty);
+
+            return order;
         }
 
         internal async Task<decimal> GetMinNotional(string symbol, string bridge)
@@ -205,7 +206,7 @@ namespace TradeBot
             return bnbBurnResult.SpotBNBBurn;
         }
 
-        private void WaitForOrder(long orderId, OrderGuard orderGuard)
+        private async Task<OrderUpdateResult> WaitForOrder(long orderId, OrderGuard orderGuard, string originSymbol, string targetSymbol)
         {
             OrderUpdateResult? order = null;
 
@@ -216,25 +217,94 @@ namespace TradeBot
                     order = BinanceCache.Orders[orderId];
                     _logger.Debug($"Waiting for order {orderId} to be created");
                 }
+                else
+                {
+                    orderGuard.Wait(orderId);
+                }
 
                 Thread.Sleep(1000);
             }
 
             _logger.Debug($"Order created: {order}");
 
-            var mutex = orderGuard.GetMutex(orderId);
-
-            while (order.Status != "FILLED")
+            while (order.Status != OrderStatus.FILLED)
             {
-                order = BinanceCache.Orders[orderId];
+                try
+                {
+                    order = BinanceCache.Orders[orderId];
 
-                _logger.Debug($"Waiting for order {orderId} to be filled");
+                    _logger.Debug($"Waiting for order {orderId} to be filled");
+
+                    if (await ShouldCancelOrder(order))
+                    {
+                        OrderCancelResult? cancelOrder = null;
+                        while (cancelOrder == null)
+                        {
+                            cancelOrder = await _apiClient.CancelOrder(originSymbol + targetSymbol, orderId);
+                        }
+
+                        _logger.Info("Order timeout, canceled");
+
+                        if (order.Status == OrderStatus.PARTIALLY_FILLED && order.Side == "BUY")
+                        {
+                            _logger.Info("Sell partially filled amount");
+
+                            var orderQty = await SellQuantity(originSymbol, targetSymbol);
+
+                            OrderResult partiallyOrder = null;
+
+                            while (partiallyOrder == null)
+                            {
+                                partiallyOrder = await _apiClient.OrderMarketSell(symbol: originSymbol + targetSymbol, quantity: orderQty);
+                            }
+
+                            _logger.Info("Going back to scout mode...");
+
+                            return null;
+                        }
+                    }
+
+                    if (order.Status == OrderStatus.CANCELED)
+                    {
+                        _logger.Info("Order is canceled, going back to scouting mode...");
+                        return null;
+                    }
+                }
+                catch (Exception e)
+                {
+                    _logger.Error("Error at WaitForOrder " + e.ToString());
+                }
+
+                if (order.Status != OrderStatus.FILLED)
+                    Thread.Sleep(1000);
             }
 
             _logger.Debug($"Order filled: {order.OrderId}");
 
+            return order;
+        }
 
-            mutex.WaitOne();
+        private async Task<bool> ShouldCancelOrder(OrderUpdateResult order)
+        {
+            long minutes = (DateTimeOffset.Now.ToUnixTimeSeconds() - order.TransactionTime) / 60;
+            int timeout = order.Side == "SELL" ? _settings.SellTimeout : _settings.BuyTimeout;
+
+            if (timeout > 0 && minutes > timeout && order.Status == OrderStatus.NEW)
+                return true;
+
+            if (timeout > 0 && minutes > timeout && order.Status == OrderStatus.PARTIALLY_FILLED)
+            {
+                if (order.Side == "SELL") return true;
+
+                var currentPrice = (await GetTickerPrice(order.Symbol)).Value;
+
+                if (currentPrice * (1 - 0.001m) > order.Price)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private async Task<double> BuyQuantity(string originSymbol, string targetSymbol, decimal? targetBalance = null, decimal? fromCoinPrice = null)
@@ -244,7 +314,7 @@ namespace TradeBot
 
             decimal originTick = await GetAltTick(originSymbol, targetSymbol);
 
-            return Math.Floor((double) targetBalance * Math.Pow(10, (double)originTick) / (double) fromCoinPrice) / Math.Pow(10, (double)originTick);
+            return Math.Floor((double)targetBalance * Math.Pow(10, (double)originTick) / (double)fromCoinPrice) / Math.Pow(10, (double)originTick);
         }
 
         private async Task<double> SellQuantity(string originSymbol, string targetSymbol, decimal? originBalance = null)
@@ -270,9 +340,20 @@ namespace TradeBot
 
         public async Task<decimal> GetCurrencyBalance(string targetSymbol)
         {
-            var account = await GetAccount();
+            Account account = null;
+            decimal? free = null;
 
-            return account.Balances.Find(b => b.Asset.Equals(targetSymbol, StringComparison.Ordinal)).Free;
+            while(null == account && null == free)
+            {
+                account = await GetAccount();
+
+                if(null != account)
+                {
+                    free = account?.Balances?.Find(b => b.Asset.Equals(targetSymbol, StringComparison.Ordinal))?.Free;
+                }
+            }
+
+            return free.GetValueOrDefault();
         }
 
         internal async Task<Account> GetAccount()

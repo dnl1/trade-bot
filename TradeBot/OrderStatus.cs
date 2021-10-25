@@ -9,5 +9,8 @@ namespace TradeBot
     internal class OrderStatus
     {
         public const string FILLED = "FILLED";
+        public const string NEW = "NEW";
+        public const string PARTIALLY_FILLED = "PARTIALLY_FILLED";
+        public const string CANCELED = "CANCELED";
     }
 }

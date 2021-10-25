@@ -10,6 +10,8 @@
         public string TelegramBotId { get; set; }
         public decimal ScoutMultiplier { get; set; }
         public int ScoutSleepTime{ get; set; }
+        public int BuyTimeout{ get; set; }
+        public int SellTimeout { get; set; }
         public string Strategy { get; set; }
         public string[] Coins { get; set; }
     }

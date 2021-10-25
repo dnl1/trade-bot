@@ -19,6 +19,7 @@ using TradeBot.Repositories;
 using TradeBot.Services;
 using TradeBot.Settings;
 using TradeBot.Strategies;
+using System.Reflection;
 
 public class Program
 {
@@ -61,10 +62,18 @@ public class Program
                 services.AddSingleton<ITradeService, TradeService>();
 
                 services.AddSingleton<TelegramProvider>();
-                services.AddSingleton<IEnumerable<INotificationProvider>>(sp =>
+                services.AddSingleton(sp =>
                 {
-                    var provider = sp.GetService<TelegramProvider>();
-                    return new[] { provider };
+                    var types = Assembly.GetExecutingAssembly().GetTypes().Where(p => typeof(INotificationProvider).IsAssignableFrom(p) && !p.IsInterface);
+                    HashSet<INotificationProvider> providers = new HashSet<INotificationProvider>();
+
+                    foreach(var type in types)
+                    {
+                        INotificationProvider? instance = (INotificationProvider) sp.GetService(type);
+                        providers.Add(instance);
+                    }
+
+                    return (IEnumerable<INotificationProvider>) providers;
                 });
                 services.AddSingleton<INotificationService, NotificationService>();
 

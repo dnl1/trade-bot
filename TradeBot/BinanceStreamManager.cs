@@ -15,21 +15,21 @@ namespace TradeBot
 {
     public class BinanceStreamManager
     {
-        private readonly AppSettings _settings;
         private readonly BinanceApiClient _apiClient;
+        private readonly ILogger _logger;
         private readonly string _baseUrl;
         private readonly Dictionary<string, int> _pendingOrders;
         private readonly CancellationToken _cancellationToken;
-        private readonly Dictionary<long, Mutex> _mutexes;
+        private readonly Dictionary<long, ManualResetEventSlim> _mutexes;
 
-        public BinanceStreamManager(AppSettings settings, BinanceApiClient binanceApiClient)
+        public BinanceStreamManager(BinanceApiClient binanceApiClient, ILogger logger)
         {
-            _settings = settings;
             _apiClient = binanceApiClient;
+            _logger = logger;
             _baseUrl = "wss://stream.binance.com:9443/ws";
             _cancellationToken = new CancellationTokenSource(5000).Token;
 
-            _mutexes = new Dictionary<long, Mutex>();
+            _mutexes = new Dictionary<long, ManualResetEventSlim>();
             _pendingOrders = new Dictionary<string, int>();
         }
 
@@ -73,7 +73,7 @@ namespace TradeBot
         {
             var listenKey = await _apiClient.GetListenKey();
 
-            JobManager.AddJob(() => _apiClient.GetListenKey().Wait(),s => s.ToRunEvery(30).Minutes());
+            JobManager.AddJob(() => _apiClient.GetListenKey().Wait(), s => s.ToRunEvery(30).Minutes());
 
             ClientWebSocket socket = await UserStreamCreateSocket(listenKey.ListenKey);
 
@@ -85,12 +85,20 @@ namespace TradeBot
                 WebSocketReceiveResult rcvResult = await socket.ReceiveAsync(rcvBuffer, new CancellationToken());
                 byte[] msgBytes = rcvBuffer.Skip(rcvBuffer.Offset).Take(rcvResult.Count).ToArray();
                 string rcvMsg = Encoding.UTF8.GetString(msgBytes);
-                var obj = JsonConvert.DeserializeObject<OrderUpdateResult>(rcvMsg);
 
-                if (null != obj && obj.OrderId > 0)
+                try
                 {
-                    BinanceCache.Orders[obj.OrderId] = obj;
-                    _mutexes[obj.OrderId].ReleaseMutex();
+                    var obj = JsonConvert.DeserializeObject<OrderUpdateResult>(rcvMsg);
+
+                    if (null != obj && obj.OrderId > 0)
+                    {
+                        BinanceCache.Orders[obj.OrderId] = obj;
+                        _mutexes[obj.OrderId].Set();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error(ex.ToString());
                 }
             }
         }
@@ -99,7 +107,7 @@ namespace TradeBot
         {
             var socket = new ClientWebSocket();
 
-            
+
             string url = $"{_baseUrl}/{listenKey}";
             await socket.ConnectAsync(new Uri(url), _cancellationToken);
             return socket;

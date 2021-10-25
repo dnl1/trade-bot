@@ -145,6 +145,7 @@ namespace TradeBot.Strategies
 
                 // db log scout
 
+                //the price of scouting coin / tocoin's price
                 decimal optCoinRatio = coinPrice / optionalCoinPrice.Value;
 
                 decimal transactionFee = (await _manager.GetFee(pair.FromCoin, BRIDGE, true)) + (await _manager.GetFee(pair.ToCoin, BRIDGE, false));

@@ -33,6 +33,8 @@ namespace TradeBot.Strategies
 
         public override async Task Scout()
         {
+            _logger.Debug($"Running scouting proccess");
+
             var haveCoin = false;
 
             var currentCoin = _coinRepository.GetCurrent();
@@ -43,7 +45,8 @@ namespace TradeBot.Strategies
                 currentCoinSymbol = currentCoin.Symbol;
             }
 
-            foreach(var coinSymbol in _appSettings.Coins)
+
+            foreach (var coinSymbol in _appSettings.Coins)
             {
                 var coinBalance = await _manager.GetCurrencyBalance(coinSymbol);
                 var coinPrice = await _manager.GetTickerPrice(coinSymbol + _appSettings.Bridge);

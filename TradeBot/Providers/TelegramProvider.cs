@@ -18,14 +18,17 @@ namespace TradeBot.Providers
         {
             string[] splited = appSettings.TelegramBotId.Split('/');
 
-            _client = new TelegramBotClient(splited[2]);
-
-            _identifier = int.Parse(splited[3]);
+            if (splited.Length > 2)
+            {
+                _client = new TelegramBotClient(splited[2]);
+                _identifier = int.Parse(splited[3]);
+            }
         }
 
         public async Task SendMessage(string msg)
         {
-            await _client.SendTextMessageAsync(new Telegram.Bot.Types.ChatId(_identifier), msg);
+            if(null != _client)
+                await _client.SendTextMessageAsync(new Telegram.Bot.Types.ChatId(_identifier), msg);
         }
     }
 }

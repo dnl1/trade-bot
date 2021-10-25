@@ -70,7 +70,7 @@ namespace TradeBot.Responses
         public string LastExecutedPrice { get; set; }
 
         [JsonProperty("n")]
-        public long CommissionAmount { get; set; }
+        public decimal CommissionAmount { get; set; }
 
         [JsonProperty("N")]
         public object CommissionAsset { get; set; }
@@ -97,7 +97,7 @@ namespace TradeBot.Responses
         public long OrderCreationTime { get; set; }
 
         [JsonProperty("Z")]
-        public string CumQuoteAssetTransactedQty { get; set; }
+        public decimal CumQuoteAssetTransactedQty { get; set; }
 
         [JsonProperty("Y")]
         public string LastQuoteAssetTransactedQty { get; set; }
