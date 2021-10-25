@@ -10,6 +10,7 @@ using System;
 using System.Globalization;
 using System.Collections.Generic;
 using System.Threading;
+using System.Linq;
 using TradeBot;
 using TradeBot.Database;
 using TradeBot.Factories;
