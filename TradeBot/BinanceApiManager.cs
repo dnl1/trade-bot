@@ -60,7 +60,7 @@ namespace TradeBot
             }
 
             OrderResult? order = null;
-            var orderGuard = _streamManager.AcquireOrderGuard();
+            using var orderGuard = _streamManager.AcquireOrderGuard();
 
             while (null == order)
             {
@@ -116,7 +116,7 @@ namespace TradeBot
             _logger.Info($"Balance is {originBalance}");
 
             OrderResult order = null;
-            var orderGuard = _streamManager.AcquireOrderGuard();
+            using var orderGuard = _streamManager.AcquireOrderGuard();
 
             while (null == order)
             {
@@ -212,14 +212,14 @@ namespace TradeBot
 
             while (null == order)
             {
-                if (BinanceCache.Orders.ContainsKey(orderId))
+                if (orderGuard.ContainsOrder())
                 {
-                    order = BinanceCache.Orders[orderId];
+                    order = orderGuard.Get();
                     _logger.Debug($"Waiting for order {orderId} to be created");
                 }
                 else
                 {
-                    orderGuard.Wait(orderId);
+                    orderGuard.Wait();
                 }
 
                 Thread.Sleep(1000);
@@ -231,7 +231,7 @@ namespace TradeBot
             {
                 try
                 {
-                    order = BinanceCache.Orders[orderId];
+                    order = orderGuard.Get();
 
                     _logger.Debug($"Waiting for order {orderId} to be filled");
 

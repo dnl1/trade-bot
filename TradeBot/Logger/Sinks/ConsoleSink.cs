@@ -1,53 +1,68 @@
 ﻿using System;
 using System.Text;
+using TradeBot.Logger;
 using TradeBot.Services;
 
 namespace TradeBot
 {
-    internal class ConsoleLogger : ILogger
+    internal class ConsoleSink: ILogEventSink
     {
-        private readonly Action<string>? _postLog;
         private readonly string _loggingService;
 
-        public ConsoleLogger(Action<string>? postLog = null, string loggingService = "")
+        public ConsoleSink(string loggingService = "")
         {
-            _postLog = postLog;
             _loggingService = loggingService;
+        }
+
+        public void Emit(LogEvent logEvent)
+        {
+            switch (logEvent.Level)
+            {
+                case LogLevel.Debug:
+                    Debug(logEvent.Message);
+                    break;
+                case LogLevel.Error:
+                    Error(logEvent.Message);
+                    break;
+                case LogLevel.Warn:
+                    Warn(logEvent.Message);
+                    break;
+                case LogLevel.Info:
+                    Info(logEvent.Message);
+                    break;
+            }
         }
 
         public void Debug(string message)
         {
             Console.ForegroundColor = ConsoleColor.DarkGray;
-            Log(message, nameof(Debug));
+            Log(message, LogLevel.Debug);
         }
 
         public void Error(string message)
         {
             Console.ForegroundColor = ConsoleColor.DarkRed;
-            Log(message, nameof(Error));
+            Log(message, LogLevel.Error);
         }
 
         public void Info(string message)
         {
             Console.ForegroundColor = ConsoleColor.DarkGreen;
-            Log(message, nameof(Info));
+            Log(message, LogLevel.Info);
         }
 
         public void Warn(string message)
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Log(message, nameof(Warn));
+            Log(message, LogLevel.Warn);
 
         }
 
-        private void Log(string message, string level)
+        private void Log(string message, LogLevel level, bool doPostLog = true)
         {
-            string msg = BuildMessage(message, level.ToUpper());
+            string msg = BuildMessage(message, level.ToString().ToUpper());
             Console.WriteLine(DateTime.Now.ToString("HH:mm:ss") + " - " + msg);
             Console.ForegroundColor = ConsoleColor.Gray;
-
-            if (null != _postLog)                                                   
-                _postLog(message);
 
         }
 

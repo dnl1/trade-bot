@@ -1,6 +1,7 @@
 ﻿using FluentScheduler;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
@@ -18,7 +19,7 @@ namespace TradeBot
         private readonly BinanceApiClient _apiClient;
         private readonly ILogger _logger;
         private readonly string _baseUrl;
-        private readonly Dictionary<string, int> _pendingOrders;
+        private readonly ConcurrentDictionary<long, OrderUpdateResult> _pendingOrders;
         private readonly CancellationToken _cancellationToken;
         private readonly Dictionary<long, ManualResetEventSlim> _mutexes;
 
@@ -30,7 +31,7 @@ namespace TradeBot
             _cancellationToken = new CancellationTokenSource(5000).Token;
 
             _mutexes = new Dictionary<long, ManualResetEventSlim>();
-            _pendingOrders = new Dictionary<string, int>();
+            _pendingOrders = new ConcurrentDictionary<long, OrderUpdateResult>();
         }
 
         public void Subscribe<T>(IEnumerable<string> tickers, string streamName, Action<T> action, CancellationToken cancellationToken)
@@ -92,7 +93,7 @@ namespace TradeBot
 
                     if (null != obj && obj.OrderId > 0)
                     {
-                        BinanceCache.Orders[obj.OrderId] = obj;
+                        _pendingOrders[obj.OrderId] = obj;
                         _mutexes[obj.OrderId].Set();
                     }
                 }

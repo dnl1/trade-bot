@@ -21,6 +21,8 @@ using TradeBot.Services;
 using TradeBot.Settings;
 using TradeBot.Strategies;
 using System.Reflection;
+using TradeBot.Logger;
+using TradeBot.Logger.Sinks;
 
 public class Program
 {
@@ -45,6 +47,7 @@ public class Program
 
                 JobManager.Initialize();
 
+                services.AddLoggers(appSettings);
                 services.AddSingleton(appSettings);
                 services.AddSingleton<BinanceApiManager>();
                 services.AddSingleton<BinanceStreamManager>();
@@ -53,7 +56,6 @@ public class Program
                 services.AddSingleton<StrategyFactory>();
                 services.AddSingleton<DefaultStrategy>();
                 services.AddSingleton<MultipleCoinsStrategy>();
-                services.AddSingleton<ILogger>(sp => new ConsoleLogger((msg) => sp.GetService<INotificationService>()?.Notify(msg), "tradebot-logger"));
                 services.AddSingleton(typeof(IDatabase<>), typeof(InMemoryDatabase<>));
                 services.AddSingleton<ICacher, Cacher>();
                 services.AddSingleton<ISnapshotRepository, SnapshotRepository>();
@@ -62,7 +64,6 @@ public class Program
                 services.AddSingleton<ITradeRepository, TradeRepository>();
                 services.AddSingleton<ITradeService, TradeService>();
 
-                services.AddSingleton<TelegramProvider>();
                 services.AddSingleton(sp =>
                 {
                     var types = Assembly.GetExecutingAssembly().GetTypes().Where(p => typeof(INotificationProvider).IsAssignableFrom(p) && !p.IsInterface);
