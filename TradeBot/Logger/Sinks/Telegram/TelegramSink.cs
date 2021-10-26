@@ -9,6 +9,7 @@ using Telegram.Bot;
 using TradeBot.Logger;
 using TradeBot.Services;
 using TradeBot.Settings;
+using System.Net.Http;
 
 namespace TradeBot
 {
