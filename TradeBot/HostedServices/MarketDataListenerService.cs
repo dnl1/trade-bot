@@ -47,8 +47,8 @@ namespace TradeBot.HostedServices
 
                 if (!dict[snapshot.Symbol]) return;
 
-                _countdown.Signal();
                 _logger.Debug($"Loaded {snapshot.Symbol}");
+                _countdown.Signal();
                 dict[snapshot.Symbol] = false;
             }, cancellationToken);
 

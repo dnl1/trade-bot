@@ -45,7 +45,6 @@ namespace TradeBot.Strategies
                 currentCoinSymbol = currentCoin.Symbol;
             }
 
-
             foreach (var coinSymbol in _appSettings.Coins)
             {
                 var coinBalance = await _manager.GetCurrencyBalance(coinSymbol);
