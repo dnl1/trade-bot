@@ -51,13 +51,15 @@ namespace TradeBot
 
             double orderQty = await BuyQuantity(originSymbol, targetSymbol, targetBalance, fromCoinPrice);
 
-            _logger.Info($"BUY QTY {orderQty} of <{originSymbol}>");
-
             if (orderQty == 0)
             {
                 _logger.Warn("Stopping because there's no funds to BUY");
                 return null;
             }
+
+            _logger.Info($"Buying {orderQty} of {originSymbol}");
+
+            _logger.Info($"Balance is {originBalance}");
 
             OrderResult? order = null;
             using var orderGuard = _streamManager.AcquireOrderGuard();
@@ -75,6 +77,8 @@ namespace TradeBot
             }
 
             if (order?.OrderId == 0) return null;
+
+            _logger.Info($"BUY ORDER {order}");
 
             var trade = _tradeService.SetOrdered(originBalance, targetBalance, orderQty);
 
@@ -168,7 +172,15 @@ namespace TradeBot
 
         internal async Task<decimal> GetFee(Coin originCoin, Coin targetCoin, bool selling)
         {
-            var baseFee = (await _apiClient.GetTradeFee()).FirstOrDefault(f => f.Symbol.Equals(originCoin.Symbol + _settings.Bridge)).TakerCommission;
+            TradeFee tradeFee = null;
+
+            while(null == tradeFee)
+            {
+                var tradeFees = await _apiClient.GetTradeFee();
+                tradeFee = tradeFees.FirstOrDefault(f => f.Symbol.Equals(originCoin.Symbol + _settings.Bridge));
+            }
+
+            var baseFee = tradeFee.TakerCommission;
 
             bool isUsingBnb = await IsUsingBnbForFees();
 
@@ -181,14 +193,14 @@ namespace TradeBot
             decimal feeAmountBnb = 0;
             decimal feeAmount = amountTrading * baseFee * 0.75m;
             if (originCoin.Symbol.Equals("BNB"))
-                feeAmountBnb = (decimal)feeAmount;
+                feeAmountBnb = feeAmount;
             else
             {
                 var originPrice = await GetTickerPrice(originCoin.Symbol + "BNB");
                 if (originPrice.Value == 0)
                     return baseFee;
 
-                feeAmountBnb = (decimal)feeAmount * originPrice.Value;
+                feeAmountBnb = feeAmount * originPrice.Value;
             }
 
             var bnbBalance = await GetCurrencyBalance("BNB");

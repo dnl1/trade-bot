@@ -21,6 +21,7 @@ namespace TradeBot.Repositories
     {
         private readonly HttpClient _httpClient;
         private readonly ICacher _cacher;
+        private readonly ILogger _logger;
         private readonly bool _testnet = false;
         private readonly string _apiKey;
         private readonly string _apiKeySecret;
@@ -49,7 +50,7 @@ namespace TradeBot.Repositories
         private const string FUTURES_API_VERSION2 = "v2";
         private const string OPTIONS_API_VERSION = "v1";
 
-        public BinanceApiClient(HttpClient httpClient, AppSettings settings, ICacher cacher)
+        public BinanceApiClient(HttpClient httpClient, AppSettings settings, ICacher cacher, ILogger logger)
         {
             if(string.IsNullOrEmpty(settings.ApiKey)|| string.IsNullOrEmpty(settings.ApiSecretKey))
             {
@@ -58,6 +59,7 @@ namespace TradeBot.Repositories
 
             _httpClient = httpClient;
             _cacher = cacher;
+            _logger = logger;
             _apiKey = settings.ApiKey;
             _apiKeySecret = settings.ApiSecretKey;
             _tld = settings.Tld;
@@ -245,9 +247,16 @@ namespace TradeBot.Repositories
                 Converters = new List<JsonConverter> { new DecimalConverter() }
             };
 
-            T obj = JsonConvert.DeserializeObject<T>(json, settings);
-
-            return obj;
+            try
+            {
+                T obj = JsonConvert.DeserializeObject<T>(json, settings);
+                return obj;
+            }
+            catch(Exception ex)
+            {
+                _logger.Error($"Trying to deserialize to {typeof(T)} JSON: {json} EXCEPTION: {ex}");
+                throw;
+            }
         }
 
         private static string ExtractQs(Dictionary<string, string> data)

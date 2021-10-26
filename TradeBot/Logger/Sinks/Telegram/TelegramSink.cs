@@ -19,9 +19,9 @@ namespace TradeBot
         ConcurrentQueue<LogEvent> _events;
         private readonly int _chatId;
 
-        public TelegramSink(string botId, string chatId)
+        public TelegramSink(string botId, string chatId, HttpClient httpClient)
         {
-            _client = new TelegramBotClient(botId ?? throw new ArgumentNullException(nameof(botId)));
+            _client = new TelegramBotClient(botId ?? throw new ArgumentNullException(nameof(botId)), httpClient);
             _chatId = int.Parse(chatId ?? throw new ArgumentNullException(nameof(chatId)));
             _events = new ConcurrentQueue<LogEvent>();
 

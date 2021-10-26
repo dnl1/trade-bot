@@ -63,7 +63,7 @@ public class Program
                 services.AddSingleton<ITradeRepository, TradeRepository>();
                 services.AddSingleton<ITradeService, TradeService>();
 
-                services.AddHttpClient<BinanceApiClient>().AddPolicyHandler(p =>
+                services.AddHttpClient<BinanceApiClient>(client => client.Timeout = TimeSpan.FromMinutes(5)).AddPolicyHandler(p =>
                     HttpPolicyExtensions
                         .HandleTransientHttpError()
                         .WaitAndRetryAsync(20, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2,

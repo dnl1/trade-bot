@@ -15,23 +15,25 @@ namespace TradeBot.Logger
         const string TELEGRAM_LOGGER = "telegram";
         public static IServiceCollection AddLoggers(this IServiceCollection services, AppSettings appSettings)
         {
-            var loggerBuilder = new LoggerBuilder();
-
-            if(Array.Exists(appSettings.Loggers, logger => logger.Equals(CONSOLE_LOGGER))) 
+            services.AddSingleton(sp =>
             {
-                loggerBuilder.AddConsole();
-            }
+                var loggerBuilder = new LoggerBuilder();
 
-            if (Array.Exists(appSettings.Loggers, logger => logger.Equals(TELEGRAM_LOGGER)) && 
-                !string.IsNullOrEmpty(appSettings.TelegramBotId) &&
-                !string.IsNullOrEmpty(appSettings.TelegramChatId))
-            {
-                loggerBuilder.AddTelegram(appSettings.TelegramBotId, appSettings.TelegramChatId);
-            }
+                if (Array.Exists(appSettings.Loggers, logger => logger.Equals(CONSOLE_LOGGER)))
+                {
+                    loggerBuilder.AddConsole();
+                }
 
-            var logger = loggerBuilder.CreateLogger();
+                if (Array.Exists(appSettings.Loggers, logger => logger.Equals(TELEGRAM_LOGGER)) &&
+                    !string.IsNullOrEmpty(appSettings.TelegramBotId) &&
+                    !string.IsNullOrEmpty(appSettings.TelegramChatId))
+                {
+                    var factory = sp.GetService<IHttpClientFactory>();
+                    loggerBuilder.AddTelegram(appSettings.TelegramBotId, appSettings.TelegramChatId, factory.CreateClient("telegram"));
+                }
 
-            services.AddSingleton(logger);
+                return loggerBuilder.CreateLogger();
+            });
 
             return services;
         }
