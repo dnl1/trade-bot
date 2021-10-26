@@ -19,7 +19,7 @@ namespace TradeBot.Logger
 
             if(Array.Exists(appSettings.Loggers, logger => logger.Equals(CONSOLE_LOGGER))) 
             {
-                loggerBuilder.AddConsoleLogger();
+                loggerBuilder.AddConsole();
             }
 
             if (Array.Exists(appSettings.Loggers, logger => logger.Equals(TELEGRAM_LOGGER)) && 

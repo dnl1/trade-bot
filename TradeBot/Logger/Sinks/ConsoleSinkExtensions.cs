@@ -8,7 +8,7 @@ namespace TradeBot.Logger.Sinks
 {
     public static class ConsoleSinkExtensions
     {
-        public static void AddConsoleLogger(this LoggerBuilder builder)
+        public static void AddConsole(this LoggerBuilder builder)
         {
             builder.AddSink(new ConsoleSink("tradebot-logger"));
         }

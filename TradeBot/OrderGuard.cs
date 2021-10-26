@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using TradeBot.Responses;
+using System.Runtime;
 
 namespace TradeBot
 {

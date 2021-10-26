@@ -58,7 +58,7 @@ namespace TradeBot
 
         }
 
-        private void Log(string message, LogLevel level, bool doPostLog = true)
+        private void Log(string message, LogLevel level)
         {
             string msg = BuildMessage(message, level.ToString().ToUpper());
             Console.WriteLine(DateTime.Now.ToString("HH:mm:ss") + " - " + msg);
