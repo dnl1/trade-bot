@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TradeBot.Logger.Sinks;
 using TradeBot.Settings;
+using System.Net.Http;
 
 namespace TradeBot.Logger
 {
