@@ -15,7 +15,6 @@ using TradeBot;
 using TradeBot.Database;
 using TradeBot.Factories;
 using TradeBot.HostedServices;
-using TradeBot.Providers;
 using TradeBot.Repositories;
 using TradeBot.Services;
 using TradeBot.Settings;
@@ -63,21 +62,6 @@ public class Program
                 services.AddSingleton<ICoinRepository, CoinRepository>();
                 services.AddSingleton<ITradeRepository, TradeRepository>();
                 services.AddSingleton<ITradeService, TradeService>();
-
-                services.AddSingleton(sp =>
-                {
-                    var types = Assembly.GetExecutingAssembly().GetTypes().Where(p => typeof(INotificationProvider).IsAssignableFrom(p) && !p.IsInterface);
-                    HashSet<INotificationProvider> providers = new HashSet<INotificationProvider>();
-
-                    foreach(var type in types)
-                    {
-                        INotificationProvider? instance = (INotificationProvider) sp.GetService(type);
-                        providers.Add(instance);
-                    }
-
-                    return (IEnumerable<INotificationProvider>) providers;
-                });
-                services.AddSingleton<INotificationService, NotificationService>();
 
                 services.AddHttpClient<BinanceApiClient>().AddPolicyHandler(p =>
                     HttpPolicyExtensions
