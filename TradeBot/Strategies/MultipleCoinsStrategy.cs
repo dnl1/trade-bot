@@ -64,7 +64,7 @@ namespace TradeBot.Strategies
 
                 haveCoin = true;
 
-                Console.WriteLine($"{DateTime.Now.ToString("HH:mm:ss")} - I am scouting best trades. Current Coin {coinSymbol + _appSettings.Bridge}");
+                _logger.Debug($"I am scouting best trades. Current Coin {coinSymbol + _appSettings.Bridge}");
 
                 await JumpToBestCoin(new Coin(coinSymbol), coinPrice.Value);
             }
