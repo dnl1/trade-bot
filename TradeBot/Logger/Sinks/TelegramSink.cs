@@ -14,6 +14,7 @@ namespace TradeBot
 {
     public class TelegramSink : ILogEventSink
     {
+        private readonly LogLevel _minLevel = LogLevel.Info;
         private readonly ITelegramBotClient _client;
         ConcurrentQueue<LogEvent> _events;
         private readonly int _chatId;
@@ -37,15 +38,14 @@ namespace TradeBot
         {
             while (true)
             {
-                if (_events.TryDequeue(out LogEvent logEvent))
+                if (_events.TryDequeue(out LogEvent logEvent) && logEvent.Level >= _minLevel)
                     await SendMessage(logEvent.Message);
             }
         }
 
         private async Task SendMessage(string msg)
         {
-            if (null != _client)
-                await _client.SendTextMessageAsync(new Telegram.Bot.Types.ChatId(_chatId), msg);
+            await _client.SendTextMessageAsync(new Telegram.Bot.Types.ChatId(_chatId), msg);
         }
     }
 }
