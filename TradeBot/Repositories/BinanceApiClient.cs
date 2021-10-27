@@ -8,15 +8,20 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using TradeBot.Converters;
+using TradeBot.Responses;
 using TradeBot.Enums;
 using TradeBot.Models;
 using TradeBot.Settings;
+using TradeBot.Database;
+using System.Globalization;
 
 namespace TradeBot.Repositories
 {
-    internal class BinanceApiClient
+    public class BinanceApiClient
     {
         private readonly HttpClient _httpClient;
+        private readonly ICacher _cacher;
+        private readonly ILogger _logger;
         private readonly bool _testnet = false;
         private readonly string _apiKey;
         private readonly string _apiKeySecret;
@@ -42,18 +47,19 @@ namespace TradeBot.Repositories
 
         private const string FUTURES_API_VERSION = "v1";
 
-
         private const string FUTURES_API_VERSION2 = "v2";
         private const string OPTIONS_API_VERSION = "v1";
 
-        public BinanceApiClient(HttpClient httpClient, AppSettings settings)
+        public BinanceApiClient(HttpClient httpClient, AppSettings settings, ICacher cacher, ILogger logger)
         {
-            if(settings.ApiKey == null || settings.ApiSecretKey == null)
+            if(string.IsNullOrEmpty(settings.ApiKey)|| string.IsNullOrEmpty(settings.ApiSecretKey))
             {
                 throw new KeyNotFoundException("ApiKey or ApiSecretKey not populated");
             }
 
             _httpClient = httpClient;
+            _cacher = cacher;
+            _logger = logger;
             _apiKey = settings.ApiKey;
             _apiKeySecret = settings.ApiSecretKey;
             _tld = settings.Tld;
@@ -71,28 +77,42 @@ namespace TradeBot.Repositories
             PopHeaders();
         }
 
-        internal async Task OrderLimitBuy(string symbol, double orderQty, decimal price)
-        {
-            await OrderLimit(symbol, orderQty, price, Side.BUY);
-        }
+        internal async Task<ListenKeyWrapper> GetListenKey() =>
+            await Post<ListenKeyWrapper>("userDataStream", false);
 
-        private async Task OrderLimit(string symbol, double orderQty, decimal price, Side side)
-        {
-            await Post<object>("order", true, data: new Dictionary<string, string>
+        internal async Task<BnbBurnResult> GetBnbBurnSpotMargin(int ttl = 60) =>
+            await _cacher.ExecuteAsync(async () =>
+                await RequestMarginApi<BnbBurnResult>("get", "bnbBurn", true)
+            , TimeSpan.FromSeconds(ttl));
+
+        internal async Task<OrderResult> OrderLimitBuy(string symbol, double orderQty, decimal price) =>
+            await OrderLimit(symbol, orderQty, price, Side.BUY);
+
+        internal async Task<OrderResult> OrderLimitSell(string symbol, double orderQty, decimal price) =>
+            await OrderLimit(symbol, orderQty, price, Side.SELL);
+
+        private async Task<OrderResult> OrderLimit(string symbol, double orderQty, decimal price, Side side) =>
+            await Post<OrderResult>("order", true, data: new Dictionary<string, string>
             {
                 { "symbol", symbol },
-                { "quantity", orderQty.ToString() },
-                { "price", price.ToString() },
+                { "quantity", orderQty.ToString(CultureInfo.InvariantCulture) },
+                { "price", price.ToString(CultureInfo.InvariantCulture) },
                 { "side", side == Side.BUY ? "BUY" : "SELL" },
                 { "type", "LIMIT" },
                 { "timeInForce", "GTC" }
             });
-        }
+        
 
         public async Task<Account> GetAccount()
         {
             return await Get<Account>("account", true, PRIVATE_API_VERSION);
         }
+
+
+        public async Task<IEnumerable<TradeFee>> GetTradeFee(int ttl = 43200) =>
+            await _cacher.ExecuteAsync(async () =>            
+                await RequestMarginApi<IEnumerable<TradeFee>>("get", "asset/tradeFee", true)
+            , TimeSpan.FromSeconds(ttl));
 
         internal async Task<Symbol> GetSymbolInfo(string symbol)
         {
@@ -106,6 +126,48 @@ namespace TradeBot.Repositories
         internal async Task<ExchangeInfo> GetExchangeInfo() =>
             await Get<ExchangeInfo>("exchangeInfo", version: PRIVATE_API_VERSION);
 
+        internal async Task<TickerResult> GetSymbolTicker(string symbol)
+        {
+            var dict = new Dictionary<string, string>()
+            {
+                { "symbol", symbol }
+            };
+
+            return await Get<TickerResult>("ticker/price", version: PRIVATE_API_VERSION, data: dict);
+        }
+
+        internal async Task<OrderResult> OrderMarketSell(string symbol, double quantity)
+        {
+            var dict = new Dictionary<string, string>()
+            {
+                { "symbol", symbol },
+                { "quantity", quantity.ToString(CultureInfo.InvariantCulture) },
+                { "side", "SELL" }
+            };
+
+            return await OrderMarket(dict);
+
+        }
+
+        private async Task<OrderResult> OrderMarket(Dictionary<string, string> dict)
+        {
+            dict.Add("type", "MARKET");
+            dict.Add("timeInForce", "GTC");
+
+            return await Post<OrderResult>("order", true, data: dict);
+        }
+
+        internal async Task<OrderCancelResult> CancelOrder(string symbol, long orderId)
+        {
+            var dict = new Dictionary<string, string>()
+            {
+                { "symbol", symbol },
+                { "orderId", orderId.ToString() }
+            };
+
+            return await Delete<OrderCancelResult>("order", version: PRIVATE_API_VERSION, data: dict);
+        }
+
         private async Task<T> Get<T>(string path, bool signed = false, string version = PUBLIC_API_VERSION, Dictionary<string, string> data = null)
         {
             data ??= new Dictionary<string, string>();
@@ -115,6 +177,15 @@ namespace TradeBot.Repositories
             return await Request<T>("GET", url, signed, data);
         }
 
+        private async Task<T> Delete<T>(string path, bool signed = false, string version = PUBLIC_API_VERSION, Dictionary<string, string> data = null)
+        {
+            data ??= new Dictionary<string, string>();
+
+            string url = CreateApiUri(path, signed, version);
+
+            return await Request<T>("DELETE", url, signed, data);
+        }
+
         private async Task<T> Post<T>(string path, bool signed = false, string version = PUBLIC_API_VERSION, Dictionary<string, string> data = null)
         {
             data ??= new Dictionary<string, string>();
@@ -122,6 +193,15 @@ namespace TradeBot.Repositories
             string url = CreateApiUri(path, signed, version);
 
             return await Request<T>("POST", url, signed, data);
+        }
+
+        private async Task<T> RequestMarginApi<T>(string method, string path, bool signed, Dictionary<string, string> data = null)
+        {
+            data ??= new Dictionary<string, string>();
+
+            string url = CreateMarginApiUri(path, signed);
+
+            return await Request<T>(method, url, signed, data);
         }
 
         private async Task<T> Request<T>(string method, string url, bool signed, Dictionary<string, string> data)
@@ -148,6 +228,11 @@ namespace TradeBot.Repositories
 
                 requestUrl += $"?{queryString}";
             }
+            else if(data.Any())
+            {
+                string queryString = ExtractQs(data);
+                requestUrl += $"?{queryString}";
+            }
 
             var response = await _httpClient.SendAsync(new HttpRequestMessage(new HttpMethod(method), requestUrl));
 
@@ -162,9 +247,16 @@ namespace TradeBot.Repositories
                 Converters = new List<JsonConverter> { new DecimalConverter() }
             };
 
-            T obj = JsonConvert.DeserializeObject<T>(json, settings);
-
-            return obj;
+            try
+            {
+                T obj = JsonConvert.DeserializeObject<T>(json, settings);
+                return obj;
+            }
+            catch(Exception ex)
+            {
+                _logger.Error($"Trying to deserialize to {typeof(T)} JSON: {json} EXCEPTION: {ex}");
+                throw;
+            }
         }
 
         private static string ExtractQs(Dictionary<string, string> data)
@@ -178,17 +270,17 @@ namespace TradeBot.Repositories
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-            /*_httpClient.DefaultRequestHeaders
-                .UserAgent
-                .Add(new ProductInfoHeaderValue("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36"));*/
-
             if (!string.IsNullOrEmpty(_apiKey))
             {
                 _httpClient.DefaultRequestHeaders.Add("X-MBX-APIKEY", _apiKey);
             }
         }
 
-
+        private string CreateMarginApiUri(string path, bool signed, string version = MARGIN_API_VERSION)
+        {
+            string url = MARGIN_API_URL;
+            return url + '/' + version + '/' + path;
+        }
         private string CreateApiUri(string path, bool signed, string version = PUBLIC_API_VERSION)
         {
             string url = API_URL;

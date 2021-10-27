@@ -3,7 +3,7 @@ using TradeBot.Models;
 
 namespace TradeBot.Repositories
 {
-    internal interface ISnapshotRepository
+    public interface ISnapshotRepository
     {
         Snapshot Get(string symbol);
         void Save(Snapshot snapshot);

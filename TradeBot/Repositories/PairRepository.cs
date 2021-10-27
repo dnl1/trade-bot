@@ -1,10 +1,11 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using TradeBot.Database;
 using TradeBot.Entities;
 
 namespace TradeBot.Repositories
 {
-    internal class PairRepository : IPairRepository
+    public class PairRepository : IPairRepository
     {
         private readonly IDatabase<Pair> _database;
 
@@ -34,6 +35,16 @@ namespace TradeBot.Repositories
         private string GetKey(string fromSymbol, string toSymbol)
         {
             return $"{fromSymbol}vs{toSymbol}";
+        }
+
+        public IEnumerable<Pair> GetPairsFrom(Coin currentCoin)
+        {
+            return _database.GetAll().Where(a => a.FromCoin.Symbol.Equals(currentCoin.Symbol));
+        }
+
+        public IEnumerable<Pair> GetPairsTo(Coin currentCoin)
+        {
+            return _database.GetAll().Where(a => a.ToCoin.Symbol.Equals(currentCoin.Symbol));
         }
     }
 }

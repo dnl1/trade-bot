@@ -12,7 +12,8 @@ namespace TradeBot.Factories
         {
             _strategies = new Dictionary<string, Func<AutoTrader>>()
             {
-                ["default"] = () => (AutoTrader) sp.GetService(typeof(DefaultStrategy))
+                ["default"] = () => (AutoTrader)sp.GetService(typeof(DefaultStrategy)),
+                ["multipleCoins"] = () => (AutoTrader)sp.GetService(typeof(MultipleCoinsStrategy))
             };
         }
 
@@ -23,7 +24,7 @@ namespace TradeBot.Factories
                 return _strategies[strategy]();
             }
 
-            return _strategies["default"]();
+            return null;
         }
     }
 }

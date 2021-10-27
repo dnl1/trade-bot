@@ -1,10 +1,12 @@
 ﻿using TradeBot.Entities;
+using System.Collections.Generic;
 
 namespace TradeBot.Repositories
 {
-    internal interface ICoinRepository
+    public interface ICoinRepository
     {
         Coin GetCurrent();
+        void Save(IEnumerable<string> coins);
         void SaveCurrent(Coin coin);
     }
 }
