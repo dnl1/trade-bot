@@ -14,6 +14,11 @@ This bot is based on [Binance Trade Bot](https://github.com/edeng23/binance-trad
 - Git clone
 - Configure an appsettings.json as the example file: appsettings.Example.json.
 - Play it with dotnet command or visual studio.
+### Azure Tool Setup
+- Create a container at Azure
+https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-portal
+- Deploy the bot
+https://docs.microsoft.com/en-us/dotnet/core/extensions/cloud-service?pivots=visualstudio
 
 ## Next features
 - Real database (actually we're using a in memory db)
