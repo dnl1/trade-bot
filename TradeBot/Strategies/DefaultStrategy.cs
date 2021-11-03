@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using TradeBot.Entities;
 using TradeBot.Repositories;
@@ -12,31 +14,67 @@ namespace TradeBot.Strategies
         private readonly ILogger _logger;
         private readonly BinanceApiManager _manager;
         private readonly AppSettings _appSettings;
+        private readonly Coin BRIDGE;
 
-        public DefaultStrategy(IPairRepository pairRepository, 
-            ISnapshotRepository snapshotRepository, 
+        public DefaultStrategy(IPairRepository pairRepository,
+            ISnapshotRepository snapshotRepository,
             ICoinRepository coinRepository,
             ILogger logger,
             BinanceApiManager manager,
-            AppSettings appSettings) : base(pairRepository, snapshotRepository)
+            AppSettings appSettings) : base(pairRepository, snapshotRepository, appSettings, manager, logger, coinRepository)
         {
             _coinRepository = coinRepository;
             _logger = logger;
             _manager = manager;
             _appSettings = appSettings;
+
+            BRIDGE = new Coin(appSettings.Bridge);
         }
 
-        public override void Initialize()
+        public override async Task Initialize()
         {
-            base.Initialize();
-            InitializeCurrentCoin().Wait();
+            await base.Initialize();
+            await InitializeCurrentCoin();
+        }
+
+        public override async Task Scout()
+        {
+            var currentCoin = _coinRepository.GetCurrent();
+
+            _logger.Info($"I am scouting the best trades. Current coin: {currentCoin.Symbol + _appSettings.Bridge} ");
+
+            var currentCoinPrice = await _manager.GetTickerPrice(currentCoin.Symbol + _appSettings.Bridge);
+
+            if (!currentCoinPrice.HasValue)
+            {
+                _logger.Warn($"Skipping scouting... current coin {currentCoin.Symbol + _appSettings.Bridge} not found");
+                return;
+            }
+
+            await base.JumpToBestCoin(currentCoin, currentCoinPrice.GetValueOrDefault());
+        }
+
+        public override async Task<Coin?> BridgeScout()
+        {
+            var currentCoin = _coinRepository.GetCurrent();
+            var coinBalance = await _manager.GetCurrencyBalance(currentCoin.Symbol);
+            var minNotional = await _manager.GetMinNotional(currentCoin.Symbol, _appSettings.Bridge);
+
+            if (coinBalance > minNotional) return null;
+
+            var newCoin = await base.BridgeScout();
+
+            if(null != newCoin)
+                _coinRepository.SaveCurrent(newCoin);
+
+            return null;
         }
 
         private async Task InitializeCurrentCoin()
         {
             var coin = _coinRepository.GetCurrent();
 
-            if(coin is null)
+            if (coin is null)
             {
                 string currentCoinSymbol = _appSettings.CurrentCoin;
 
@@ -47,17 +85,17 @@ namespace TradeBot.Strategies
                     currentCoinSymbol = _appSettings.Coins[index];
                 }
 
-                _logger.Information($"Setting initial coin to {currentCoinSymbol}");
+                _logger.Info($"Setting initial coin to {currentCoinSymbol}");
 
                 var currentCoin = new Coin(currentCoinSymbol);
 
                 _coinRepository.SaveCurrent(currentCoin);
 
-                _logger.Information($"Purchasing {currentCoinSymbol} to begin trading");
+                _logger.Info($"Purchasing {currentCoinSymbol} to begin trading");
 
                 await _manager.BuyAlt(currentCoin, new Coin(_appSettings.Bridge));
 
-                _logger.Information("Ready to start trading");
+                _logger.Info("Ready to start trading");
             }
         }
     }

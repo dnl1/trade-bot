@@ -1,7 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using Newtonsoft.Json;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using TradeBot.Models;
 using TradeBot.Repositories;
 using TradeBot.Settings;
 
@@ -12,7 +14,7 @@ namespace TradeBot.HostedServices
         private readonly AppSettings _settings;
         private readonly BinanceStreamManager _binanceStreamManager;
         private readonly ILogger _logger;
-        private readonly ISnapshotRepository _repository;
+        private readonly ISnapshotRepository _snapshotRepository;
         private CountdownEvent _countdown;
 
         public MarketDataListenerService(AppSettings settings, BinanceStreamManager binanceStreamManager, ILogger logger, ISnapshotRepository repository)
@@ -20,7 +22,7 @@ namespace TradeBot.HostedServices
             _settings = settings;
             _binanceStreamManager = binanceStreamManager;
             _logger = logger;
-            _repository = repository;
+            _snapshotRepository = repository;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -33,24 +35,26 @@ namespace TradeBot.HostedServices
 
             tickers.ForEach(ticker =>
             {
-                _logger.Information($"Subscribing for {ticker}");
+                _logger.Info($"Subscribing for {ticker}");
                 dict.Add(ticker, true);
             });
 
-            _binanceStreamManager.Subscribe(tickers, (snapshot) =>
-            {
-                _repository.Save(snapshot);
+            _binanceStreamManager.StreamProcessor().ConfigureAwait(false);
 
-                if (dict[snapshot.Symbol])
-                {
-                    _countdown.Signal();
-                    dict[snapshot.Symbol] = false;
-                }
+            _binanceStreamManager.Subscribe<Snapshot>(tickers, "aggTrade", (snapshot) =>
+            {
+                _snapshotRepository.Save(snapshot);
+
+                if (!dict[snapshot.Symbol]) return;
+
+                _logger.Debug($"Loaded {snapshot.Symbol}");
+                _countdown.Signal();
+                dict[snapshot.Symbol] = false;
             }, cancellationToken);
 
             return Task.CompletedTask;
         }
 
-        public CountdownEvent GetCountdownEvent() => _countdown;
+        public void Wait() => _countdown.Wait();
     }
 }

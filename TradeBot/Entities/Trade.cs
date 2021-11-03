@@ -7,11 +7,12 @@ namespace TradeBot.Entities
     {
         public decimal AltStartingBalance { get; }
         public decimal CryptoStartingBalance { get; }
+        public decimal CryptoTradingAmount { get; private set; }
         public double AltTradeAmount { get; }
-        public TradeState State { get; }
+        public TradeState State { get; private set; }
         public Coin? AltCoin { get; }
         public Coin? CryptoCoin { get; }
-        public Side? Side { get; }
+        public Side? Side { get; set; }
         public DateTime Date { get; }
         
         public Trade(decimal altStartingBalance, decimal cryptoStartingBalance, double altTradeAmount)
@@ -30,6 +31,12 @@ namespace TradeBot.Entities
             Side = side;
             State = TradeState.Starting;
             Date = DateTime.Now;
+        }
+
+        public void SetComplete(decimal cryptoTradingAmount)
+        {
+            CryptoTradingAmount = cryptoTradingAmount;
+            State = TradeState.Complete;
         }
     }
 }

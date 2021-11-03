@@ -1,8 +1,8 @@
 ﻿using Newtonsoft.Json;
 
-namespace TradeBot.Models
+namespace TradeBot
 {
-    public class Snapshot
+    internal class TradeSnapshot
     {
         [JsonProperty("e")]
         public string EventType { get; set; }
@@ -14,19 +14,16 @@ namespace TradeBot.Models
         public string Symbol { get; set; }
 
         [JsonProperty("a")]
-        public long AggTradeId { get; set; }
+        public long SellerOrderId { get; set; }
+
+        [JsonProperty("b")]
+        public long BuyerOrderId { get; set; }
 
         [JsonProperty("p")]
         public decimal Price { get; set; }
 
         [JsonProperty("q")]
-        public string Quantity { get; set; }
-
-        [JsonProperty("f")]
-        public long FirstTradeId { get; set; }
-
-        [JsonProperty("l")]
-        public long LastTradeId { get; set; }
+        public decimal Quantity { get; set; }
 
         [JsonProperty("T")]
         public long TradeTime { get; set; }
