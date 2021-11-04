@@ -54,19 +54,15 @@ namespace TradeBot
 
                 var rcvBytes = new byte[1000];
                 var rcvBuffer = new ArraySegment<byte>(rcvBytes);
+                WebSocketReceiveResult pingResult = await socket.ReceiveAsync(rcvBuffer, _cancellationToken);
 
-                WebSocketReceiveResult ping = await socket.ReceiveAsync(rcvBuffer, cancellationToken);
-
-                while (true)
+                await Listen(socket, nameof(Subscribe), (rcvMsg) =>
                 {
-                    WebSocketReceiveResult rcvResult = await socket.ReceiveAsync(rcvBuffer, cancellationToken);
-                    byte[] msgBytes = rcvBuffer.Skip(rcvBuffer.Offset).Take(rcvResult.Count).ToArray();
-                    string rcvMsg = Encoding.UTF8.GetString(msgBytes);
                     var obj = JsonConvert.DeserializeObject<T>(rcvMsg);
 
                     if (null != obj)
                         action(obj);
-                }
+                });
             }, TaskCreationOptions.LongRunning);
         }
 
@@ -76,49 +72,55 @@ namespace TradeBot
 
             JobManager.AddJob(() => _apiClient.GetListenKey().Wait(), s => s.ToRunEvery(30).Minutes());
 
-            ClientWebSocket socket = await UserStreamCreateSocket(listenKey.ListenKey);
+            ClientWebSocket socket = await CreateSocket($"{_baseUrl}/{listenKey.ListenKey}");
 
+            await Listen(socket, nameof(StreamProcessor), (rcvMsg) =>
+            {
+                var obj = JsonConvert.DeserializeObject<OrderUpdateResult>(rcvMsg);
+
+                if (null != obj && obj.OrderId > 0)
+                {
+                    _pendingOrders[obj.OrderId] = obj;
+                    _mutexes[obj.OrderId].Set();
+                }
+            });
+        }
+
+        private async Task Listen(ClientWebSocket socket, string socketName, Action<string> action)
+        {
             var rcvBytes = new byte[1000];
             var rcvBuffer = new ArraySegment<byte>(rcvBytes);
 
             while (true)
             {
                 WebSocketReceiveResult rcvResult = await socket.ReceiveAsync(rcvBuffer, new CancellationToken());
+
+                if (rcvResult.MessageType.Equals(WebSocketMessageType.Close))
+                {
+                    _logger.Warn($"Socket {socketName} closed tcp connection");
+                }
+
                 byte[] msgBytes = rcvBuffer.Skip(rcvBuffer.Offset).Take(rcvResult.Count).ToArray();
                 string rcvMsg = Encoding.UTF8.GetString(msgBytes);
 
                 try
                 {
-                    var obj = JsonConvert.DeserializeObject<OrderUpdateResult>(rcvMsg);
-
-                    if (null != obj && obj.OrderId > 0)
-                    {
-                        _pendingOrders[obj.OrderId] = obj;
-                        _mutexes[obj.OrderId].Set();
-                    }
+                    action(rcvMsg);
                 }
                 catch (Exception ex)
                 {
-                    _logger.Error(ex.ToString());
+                    _logger.Error($"{socketName} {ex}");
                 }
             }
         }
 
-        private async Task<ClientWebSocket> UserStreamCreateSocket(string listenKey)
+        private async Task<ClientWebSocket> CreateSocket(string url = null)
         {
+            url ??= _baseUrl;
+
             var socket = new ClientWebSocket();
 
-
-            string url = $"{_baseUrl}/{listenKey}";
             await socket.ConnectAsync(new Uri(url), _cancellationToken);
-            return socket;
-        }
-
-        private async Task<ClientWebSocket> CreateSocket()
-        {
-            var socket = new ClientWebSocket();
-
-            await socket.ConnectAsync(new Uri($"{_baseUrl}"), _cancellationToken);
             return socket;
         }
 
@@ -126,6 +128,5 @@ namespace TradeBot
         {
             return new OrderGuard(_pendingOrders, _mutexes);
         }
-
     }
 }

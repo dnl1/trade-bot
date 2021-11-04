@@ -52,7 +52,7 @@ namespace TradeBot.Repositories
 
         public BinanceApiClient(HttpClient httpClient, AppSettings settings, ICacher cacher, ILogger logger)
         {
-            if(string.IsNullOrEmpty(settings.ApiKey)|| string.IsNullOrEmpty(settings.ApiSecretKey))
+            if (string.IsNullOrEmpty(settings.ApiKey) || string.IsNullOrEmpty(settings.ApiSecretKey))
             {
                 throw new KeyNotFoundException("ApiKey or ApiSecretKey not populated");
             }
@@ -101,7 +101,7 @@ namespace TradeBot.Repositories
                 { "type", "LIMIT" },
                 { "timeInForce", "GTC" }
             });
-        
+
 
         public async Task<Account> GetAccount()
         {
@@ -110,15 +110,20 @@ namespace TradeBot.Repositories
 
 
         public async Task<IEnumerable<TradeFee>> GetTradeFee(int ttl = 43200) =>
-            await _cacher.ExecuteAsync(async () =>            
+            await _cacher.ExecuteAsync(async () =>
                 await RequestMarginApi<IEnumerable<TradeFee>>("get", "asset/tradeFee", true)
             , TimeSpan.FromSeconds(ttl));
 
         internal async Task<Symbol> GetSymbolInfo(string symbol)
         {
-            var exhcangeInfo = await GetExchangeInfo();
+            ExchangeInfo exchangeInfo = null;
 
-            var symbolObj = exhcangeInfo.Symbols.Find(s => s.SymbolName == symbol);
+            while (null == exchangeInfo && null == exchangeInfo?.Symbols)
+            {
+                exchangeInfo = await GetExchangeInfo();
+            }
+
+            var symbolObj = exchangeInfo.Symbols.Find(s => s.SymbolName == symbol);
 
             return symbolObj;
         }
@@ -220,15 +225,15 @@ namespace TradeBot.Repositories
 
                 var hashBytes = hmac.ComputeHash(qsBytes);
 
-                string signature = BitConverter.ToString(hashBytes).Replace("-", "").ToLower();   
+                string signature = BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
 
-                data.Add("signature", signature);                
+                data.Add("signature", signature);
 
                 queryString = ExtractQs(data);
 
                 requestUrl += $"?{queryString}";
             }
-            else if(data.Any())
+            else if (data.Any())
             {
                 string queryString = ExtractQs(data);
                 requestUrl += $"?{queryString}";
@@ -252,7 +257,7 @@ namespace TradeBot.Repositories
                 T obj = JsonConvert.DeserializeObject<T>(json, settings);
                 return obj;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 _logger.Error($"Trying to deserialize to {typeof(T)} JSON: {json} EXCEPTION: {ex}");
                 throw;
