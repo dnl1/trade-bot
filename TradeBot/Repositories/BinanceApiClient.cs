@@ -102,17 +102,15 @@ namespace TradeBot.Repositories
                 { "timeInForce", "GTC" }
             });
 
-
         public async Task<Account> GetAccount()
         {
             return await Get<Account>("account", true, PRIVATE_API_VERSION);
         }
 
-
         public async Task<IEnumerable<TradeFee>> GetTradeFee(int ttl = 43200) =>
-            await _cacher.ExecuteAsync(async () =>
-                await RequestMarginApi<IEnumerable<TradeFee>>("get", "asset/tradeFee", true)
-            , TimeSpan.FromSeconds(ttl));
+
+            await _cacher.ExecuteAsync(async () =>            
+                await RequestMarginApi<IEnumerable<TradeFee>>("get", "asset/tradeFee", true), TimeSpan.FromSeconds(ttl));
 
         internal async Task<Symbol> GetSymbolInfo(string symbol)
         {
@@ -233,7 +231,7 @@ namespace TradeBot.Repositories
 
                 requestUrl += $"?{queryString}";
             }
-            else if (data.Any())
+            else if(data.Any())
             {
                 string queryString = ExtractQs(data);
                 requestUrl += $"?{queryString}";

@@ -128,5 +128,6 @@ namespace TradeBot
         {
             return new OrderGuard(_pendingOrders, _mutexes);
         }
+
     }
 }
