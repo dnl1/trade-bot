@@ -25,11 +25,6 @@ namespace TradeBot
             _mutexes.Add(orderId, new ManualResetEventSlim(false));
         }
 
-        internal ManualResetEventSlim GetMutex()
-        {
-            return _mutexes[_orderId];
-        }
-
         internal void Wait()
         {
             if(_mutexes.ContainsKey(_orderId))

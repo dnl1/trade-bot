@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using TradeBot.Entities;
@@ -368,16 +369,15 @@ namespace TradeBot
             return free.GetValueOrDefault();
         }
 
-        internal async Task<Account> GetAccount()
-        {
-            return await _apiClient.GetAccount();
-        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal async Task<Account> GetAccount() =>
+            await _apiClient.GetAccount();
 
         public async Task<decimal?> GetTickerPrice(string symbol)
         {
-            //var response = _snapshotRepository.Get(symbol)?.Price;
+            var response = _snapshotRepository.Get(symbol)?.Price;
 
-            //if (response != null) return response;
+            if (response != null) return response;
 
             var ticker = await _apiClient.GetSymbolTicker(symbol);
 

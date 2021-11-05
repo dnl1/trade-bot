@@ -14,6 +14,7 @@ using TradeBot.Models;
 using TradeBot.Settings;
 using TradeBot.Database;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace TradeBot.Repositories
 {
@@ -77,20 +78,26 @@ namespace TradeBot.Repositories
             PopHeaders();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal async Task<ListenKeyWrapper> GetListenKey() =>
             await Post<ListenKeyWrapper>("userDataStream", false);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal async Task<BnbBurnResult> GetBnbBurnSpotMargin(int ttl = 60) =>
             await _cacher.ExecuteAsync(async () =>
                 await RequestMarginApi<BnbBurnResult>("get", "bnbBurn", true)
             , TimeSpan.FromSeconds(ttl));
 
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal async Task<OrderResult> OrderLimitBuy(string symbol, double orderQty, decimal price) =>
             await OrderLimit(symbol, orderQty, price, Side.BUY);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal async Task<OrderResult> OrderLimitSell(string symbol, double orderQty, decimal price) =>
             await OrderLimit(symbol, orderQty, price, Side.SELL);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private async Task<OrderResult> OrderLimit(string symbol, double orderQty, decimal price, Side side) =>
             await Post<OrderResult>("order", true, data: new Dictionary<string, string>
             {
@@ -102,13 +109,14 @@ namespace TradeBot.Repositories
                 { "timeInForce", "GTC" }
             });
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task<Account> GetAccount()
         {
             return await Get<Account>("account", true, PRIVATE_API_VERSION);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task<IEnumerable<TradeFee>> GetTradeFee(int ttl = 43200) =>
-
             await _cacher.ExecuteAsync(async () =>            
                 await RequestMarginApi<IEnumerable<TradeFee>>("get", "asset/tradeFee", true), TimeSpan.FromSeconds(ttl));
 
@@ -126,6 +134,7 @@ namespace TradeBot.Repositories
             return symbolObj;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal async Task<ExchangeInfo> GetExchangeInfo() =>
             await Get<ExchangeInfo>("exchangeInfo", version: PRIVATE_API_VERSION);
 
@@ -149,7 +158,6 @@ namespace TradeBot.Repositories
             };
 
             return await OrderMarket(dict);
-
         }
 
         private async Task<OrderResult> OrderMarket(Dictionary<string, string> dict)

@@ -14,7 +14,6 @@ namespace TradeBot.Strategies
         private readonly ILogger _logger;
         private readonly BinanceApiManager _manager;
         private readonly AppSettings _appSettings;
-        private readonly Coin BRIDGE;
 
         public MultipleCoinsStrategy(IPairRepository pairRepository,
             ISnapshotRepository snapshotRepository,
@@ -27,8 +26,6 @@ namespace TradeBot.Strategies
             _logger = logger;
             _manager = manager;
             _appSettings = appSettings;
-
-            BRIDGE = new Coin(appSettings.Bridge);
         }
 
         public override async Task Scout()
