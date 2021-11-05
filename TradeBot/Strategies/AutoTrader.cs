@@ -137,7 +137,8 @@ namespace TradeBot.Strategies
             {
                 var optionalCoinPrice = await _manager.GetTickerPrice(pair.ToCoin.Symbol + _appSettings.Bridge);
 
-                if (!optionalCoinPrice.HasValue)
+                if (!optionalCoinPrice.HasValue && optionalCoinPrice.Value <= 0)
+
                 {
                     _logger.Warn($"Skipping scouting... optional coin {pair.ToCoin.Symbol} not found");
                     continue;
