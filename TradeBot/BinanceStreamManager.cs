@@ -23,6 +23,7 @@ namespace TradeBot
         private readonly ConcurrentDictionary<long, OrderUpdateResult> _pendingOrders;
         private readonly CancellationToken _cancellationToken;
         private readonly Dictionary<long, ManualResetEventSlim> _mutexes;
+        private readonly Dictionary<string, Thread> _subscribers;
 
         public BinanceStreamManager(BinanceApiClient binanceApiClient, ILogger logger)
         {
@@ -33,11 +34,14 @@ namespace TradeBot
 
             _mutexes = new Dictionary<long, ManualResetEventSlim>();
             _pendingOrders = new ConcurrentDictionary<long, OrderUpdateResult>();
+            _subscribers = new Dictionary<string, Thread>();
         }
 
         public void Subscribe<T>(IEnumerable<string> tickers, string streamName, Action<T> action, CancellationToken cancellationToken)
         {
-            Task.Factory.StartNew<Task>(async () =>
+            string subscriberId = $"{nameof(Subscribe)} {streamName}";
+
+            var thread = new Thread(async () =>
             {
                 ClientWebSocket socket = await CreateSocket();
 
@@ -55,7 +59,7 @@ namespace TradeBot
 
                 var rcvBytes = new byte[1000];
                 var rcvBuffer = new ArraySegment<byte>(rcvBytes);
-                WebSocketReceiveResult pingResult = await socket.ReceiveAsync(rcvBuffer, _cancellationToken);
+                WebSocketReceiveResult pingResult = await socket.ReceiveAsync(rcvBuffer, cancellationToken);
 
                 await Listen(socket, nameof(Subscribe), (rcvMsg) =>
                 {
@@ -63,16 +67,22 @@ namespace TradeBot
 
                     if (null != obj)
                         action(obj);
-                });
-            }, TaskCreationOptions.LongRunning);
+                }, cancellationToken);
+            })
+            {
+                Name = subscriberId
+            };
+
+            _subscribers.Add(subscriberId, thread);
+
+            _subscribers[subscriberId].Start();
         }
 
-        internal async Task StreamProcessor()
+        internal async Task StreamProcessor(CancellationToken cancellationToken)
         {
             var listenKey = await _apiClient.GetListenKey();
 
-            JobManager.AddJob(() => _apiClient.GetListenKey().Wait(), s => s.ToRunEvery(30).Minutes());
-
+            JobManager.AddJob(() => _apiClient.GetListenKey().Wait(), s => s.WithName(nameof(StreamProcessor)).ToRunEvery(30).Minutes());
             ClientWebSocket socket = await CreateSocket($"{_baseUrl}/{listenKey.ListenKey}");
 
             await Listen(socket, nameof(StreamProcessor), (rcvMsg) =>
@@ -82,19 +92,21 @@ namespace TradeBot
                 if (null != obj && obj.OrderId > 0)
                 {
                     _pendingOrders[obj.OrderId] = obj;
-                    _mutexes[obj.OrderId].Set();
+
+                    if (_mutexes.ContainsKey(obj.OrderId))
+                        _mutexes[obj.OrderId].Set();
                 }
-            });
+            }, cancellationToken);
         }
 
-        private async Task Listen(ClientWebSocket socket, string socketName, Action<string> action)
+        private async Task Listen(ClientWebSocket socket, string socketName, Action<string> action, CancellationToken cancellationToken)
         {
             var rcvBytes = new byte[1000];
             var rcvBuffer = new ArraySegment<byte>(rcvBytes);
 
             while (true)
             {
-                WebSocketReceiveResult rcvResult = await socket.ReceiveAsync(rcvBuffer, new CancellationToken());
+                WebSocketReceiveResult rcvResult = await socket.ReceiveAsync(rcvBuffer, cancellationToken);
 
                 if (rcvResult.MessageType.Equals(WebSocketMessageType.Close))
                 {

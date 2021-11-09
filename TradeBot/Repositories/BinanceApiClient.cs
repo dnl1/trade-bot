@@ -117,22 +117,24 @@ namespace TradeBot.Repositories
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public async Task<IEnumerable<TradeFee>> GetTradeFee(int ttl = 43200) =>
-            await _cacher.ExecuteAsync(async () =>            
+            await _cacher.ExecuteAsync(async () =>
                 await RequestMarginApi<IEnumerable<TradeFee>>("get", "asset/tradeFee", true), TimeSpan.FromSeconds(ttl));
 
-        internal async Task<Symbol> GetSymbolInfo(string symbol)
-        {
-            ExchangeInfo exchangeInfo = null;
-
-            while (null == exchangeInfo && null == exchangeInfo?.Symbols)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal async Task<Symbol?> GetSymbolInfo(string symbol, int ttl = 43200) =>
+            await _cacher.ExecuteAsync(async () =>
             {
-                exchangeInfo = await GetExchangeInfo();
-            }
+                ExchangeInfo exchangeInfo = null;
 
-            var symbolObj = exchangeInfo.Symbols.Find(s => s.SymbolName == symbol);
+                while (null == exchangeInfo?.Symbols)
+                {
+                    exchangeInfo = await GetExchangeInfo();
+                }
 
-            return symbolObj;
-        }
+                var symbolObj = exchangeInfo.Symbols.Find(s => s.SymbolName == symbol);
+
+                return symbolObj;
+            }, TimeSpan.FromSeconds(ttl));
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal async Task<ExchangeInfo> GetExchangeInfo() =>
@@ -239,7 +241,7 @@ namespace TradeBot.Repositories
 
                 requestUrl += $"?{queryString}";
             }
-            else if(data.Any())
+            else if (data.Any())
             {
                 string queryString = ExtractQs(data);
                 requestUrl += $"?{queryString}";

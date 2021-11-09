@@ -51,7 +51,7 @@ namespace TradeBot.Strategies
                 return;
             }
 
-            await base.JumpToBestCoin(currentCoin, currentCoinPrice.GetValueOrDefault());
+            await JumpToBestCoin(currentCoin, currentCoinPrice.GetValueOrDefault());
         }
 
         public override async Task<Coin?> BridgeScout()

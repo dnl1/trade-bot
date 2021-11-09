@@ -25,7 +25,22 @@ namespace TradeBot.HostedServices
             _snapshotRepository = repository;
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
+        public Task StartAsync()
+        {
+            var cancellationToken = new CancellationToken();
+
+            StartProcessor(cancellationToken);
+            SubscribeTickers(cancellationToken);
+
+            return Task.CompletedTask;
+        }
+
+        private void StartProcessor(CancellationToken cancellationToken)
+        {
+            _binanceStreamManager.StreamProcessor(cancellationToken).ConfigureAwait(false);
+        }
+
+        private void SubscribeTickers(CancellationToken cancellationToken)
         {
             var tickers = _settings.Coins.Select(coin => $"{coin}{_settings.Bridge}".ToUpper()).ToList();
 
@@ -39,8 +54,6 @@ namespace TradeBot.HostedServices
                 dict.Add(ticker, true);
             });
 
-            _binanceStreamManager.StreamProcessor().ConfigureAwait(false);
-
             _binanceStreamManager.Subscribe<Snapshot>(tickers, "aggTrade", (snapshot) =>
             {
                 _snapshotRepository.Save(snapshot);
@@ -51,8 +64,6 @@ namespace TradeBot.HostedServices
                 _countdown.Signal();
                 dict[snapshot.Symbol] = false;
             }, cancellationToken);
-
-            return Task.CompletedTask;
         }
 
         public void Wait() => _countdown.Wait();

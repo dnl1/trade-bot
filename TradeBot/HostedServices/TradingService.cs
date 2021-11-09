@@ -41,11 +41,11 @@ namespace TradeBot.HostedServices
 
             _coinRepository.Save(_settings.Coins);
 
-            await _marketDataListenerService.StartAsync(cancellationToken);
+            await _marketDataListenerService.StartAsync();
 
             var strategy = _strategyFactory.GetStrategy(_settings.Strategy);
 
-            if(null == strategy)
+            if (null == strategy)
             {
                 _logger.Error("Invalid strategy name");
                 return;
@@ -60,7 +60,7 @@ namespace TradeBot.HostedServices
             await strategy.Initialize();
 
             await strategy.Scout();
-            JobManager.AddJob(async () => await strategy.Scout(), s => s.ToRunEvery(_settings.ScoutSleepTime).Minutes());
+            JobManager.AddJob(async () => await strategy.Scout(), s => s.WithName("scouting").ToRunEvery(_settings.ScoutSleepTime).Minutes());
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
