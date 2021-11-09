@@ -5,7 +5,7 @@
 This bot is based on [Binance Trade Bot](https://github.com/edeng23/binance-trade-bot).
 
 ## Binance Setup
-- Create a Binance account (Includes my referral link, I'll be super grateful if you use it).
+- Create a [Binance account](https://accounts.binance.com/pt-BR/register?ref=213337767)
 - Enable Two-factor Authentication.
 - Create a new API key.
 - Get a cryptocurrency. If its symbol is not in the default list, add it.
