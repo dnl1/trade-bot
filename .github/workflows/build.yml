@@ -13,6 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The ubuntu-latest runner ships with a stale Cloudflare apt source that
+      # lacks a Release file, causing apt-get update to fail inside setup-dotnet.
+      - name: Remove broken apt sources
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/cloudflared.list
+          sudo rm -f /etc/apt/sources.list.d/cloudflare*.list
+
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
