@@ -86,6 +86,11 @@ echo ""
 
 # ── 1. Update packages ────────────────────────────────────────────────────────
 header "1. Updating system packages"
+
+# Remove stale third-party apt sources that lack a Release file (e.g. Cloudflare)
+# and would cause apt-get update to fail with "does not have a Release file".
+find /etc/apt/sources.list.d/ -name "cloudflare*.list" -delete 2>/dev/null || true
+
 apt-get update -qq
 apt-get install -y -qq \
   ca-certificates curl gnupg lsb-release git make \
