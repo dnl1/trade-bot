@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System;
 
 namespace TradeBot.Logger
 {
@@ -10,11 +6,13 @@ namespace TradeBot.Logger
     {
         public LogEvent(LogLevel level, string message)
         {
-            Level = level;
-            Message = message;
+            Level     = level;
+            Message   = message;
+            Timestamp = DateTime.UtcNow;
         }
 
-        public LogLevel Level { get; private set; }
-        public string Message { get; private set; }
+        public LogLevel  Level     { get; }
+        public string    Message   { get; }
+        public DateTime  Timestamp { get; }
     }
 }

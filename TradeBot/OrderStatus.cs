@@ -6,11 +6,13 @@ using System.Threading.Tasks;
 
 namespace TradeBot
 {
-    internal class OrderStatus
+    internal static class OrderStatus
     {
         public const string FILLED = "FILLED";
         public const string NEW = "NEW";
         public const string PARTIALLY_FILLED = "PARTIALLY_FILLED";
         public const string CANCELED = "CANCELED";
+        public const string EXPIRED = "EXPIRED";
+        public const string REJECTED = "REJECTED";
     }
 }

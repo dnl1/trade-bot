@@ -10,7 +10,7 @@ namespace TradeBot.Logger.Sinks
     {
         public static void AddConsole(this LoggerBuilder builder)
         {
-            builder.AddSink(new ConsoleSink("tradebot-logger"));
+            builder.AddSink(new ConsoleSink());
         }
     }
 }

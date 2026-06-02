@@ -5,7 +5,7 @@ namespace TradeBot.Repositories
 {
     public interface ISnapshotRepository
     {
-        Snapshot Get(string symbol);
+        Snapshot? Get(string symbol);
         void Save(Snapshot snapshot);
         IEnumerable<Snapshot> GetAll();
     }

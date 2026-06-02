@@ -30,19 +30,19 @@ namespace TradeBot.Models
         public long UpdateTime { get; set; }
 
         [JsonProperty("accountType")]
-        public string AccountType { get; set; }
+        public string AccountType { get; set; } = null!;
 
         [JsonProperty("balances")]
-        public List<Balance> Balances { get; set; }
+        public List<Balance> Balances { get; set; } = new();
 
         [JsonProperty("permissions")]
-        public List<string> Permissions { get; set; }
+        public List<string> Permissions { get; set; } = new();
     }
 
     public class Balance
     {
         [JsonProperty("asset")]
-        public string Asset { get; set; }
+        public string Asset { get; set; } = null!;
 
         [JsonProperty("free")]
         public decimal Free { get; set; }

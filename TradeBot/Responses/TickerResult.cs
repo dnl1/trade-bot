@@ -10,7 +10,7 @@ namespace TradeBot.Responses
     public class TickerResult
     {
         [JsonProperty("symbol")]
-        public string Symbol { get; set; }
+        public string Symbol { get; set; } = null!;
 
         [JsonProperty("price")]
         public decimal Price { get; set; }

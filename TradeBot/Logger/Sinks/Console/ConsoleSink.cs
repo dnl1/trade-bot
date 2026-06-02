@@ -1,86 +1,33 @@
-﻿using System;
-using System.Text;
+using System;
 using TradeBot.Logger;
-using TradeBot.Services;
 
 namespace TradeBot
 {
-    internal class ConsoleSink: ILogEventSink
+    internal class ConsoleSink : ILogEventSink
     {
-        private readonly string _loggingService;
+        private static readonly object _lock = new();
 
-        public ConsoleSink(string loggingService = "")
+        public void Emit(LogEvent evt)
         {
-            _loggingService = loggingService;
-        }
-
-        public void Emit(LogEvent logEvent)
-        {
-            switch (logEvent.Level)
+            var (color, label) = evt.Level switch
             {
-                case LogLevel.Debug:
-                    Debug(logEvent.Message);
-                    break;
-                case LogLevel.Error:
-                    Error(logEvent.Message);
-                    break;
-                case LogLevel.Warn:
-                    Warn(logEvent.Message);
-                    break;
-                case LogLevel.Info:
-                    Info(logEvent.Message);
-                    break;
-            }
-        }
+                LogLevel.Debug => (ConsoleColor.DarkGray, "DEBUG"),
+                LogLevel.Info  => (ConsoleColor.Cyan,     "INFO "),
+                LogLevel.Warn  => (ConsoleColor.Yellow,   "WARN "),
+                LogLevel.Error => (ConsoleColor.Red,      "ERROR"),
+                _              => (ConsoleColor.Gray,     "?????")
+            };
 
-        public void Debug(string message)
-        {
-            Console.ForegroundColor = ConsoleColor.DarkGray;
-            Log(message, LogLevel.Debug);
-        }
-
-        public void Error(string message)
-        {
-            Console.ForegroundColor = ConsoleColor.DarkRed;
-            Log(message, LogLevel.Error);
-        }
-
-        public void Info(string message)
-        {
-            Console.ForegroundColor = ConsoleColor.DarkGreen;
-            Log(message, LogLevel.Info);
-        }
-
-        public void Warn(string message)
-        {
-            Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Log(message, LogLevel.Warn);
-
-        }
-
-        private void Log(string message, LogLevel level)
-        {
-            string msg = BuildMessage(message, level.ToString().ToUpper());
-            Console.WriteLine(DateTime.Now.ToString("HH:mm:ss") + " - " + msg);
-            Console.ForegroundColor = ConsoleColor.Gray;
-
-        }
-
-        private string BuildMessage(string message, string level)
-        {
-            StringBuilder builder = new();
-
-            if (!string.IsNullOrEmpty(_loggingService))
+            lock (_lock)
             {
-                builder
-                    .Append("[")
-                    .Append(_loggingService)
-                    .Append("] - ");
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write($"{evt.Timestamp:yyyy-MM-dd HH:mm:ss} UTC ");
+                Console.ForegroundColor = color;
+                Console.Write($"[{label}] ");
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine(evt.Message);
+                Console.ResetColor();
             }
-
-            return builder.Append(level)
-            .Append(" - ")
-            .Append(message).ToString();
         }
     }
 }

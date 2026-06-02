@@ -6,7 +6,7 @@ namespace TradeBot.Services
     public interface ITradeService
     {
         Trade SetOrdered(decimal altStartingBalance, decimal cryptoStartingBalance, double altTradeAmount);
-        void StartTradeLog(Coin origin, Coin target, Side bUY);
+        void StartTradeLog(Coin origin, Coin target, Side side);
         void SetComplete(Trade trade, decimal cummulativeQuoteQty);
     }
 }

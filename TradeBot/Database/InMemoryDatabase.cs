@@ -1,49 +1,29 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace TradeBot.Database
 {
     internal class InMemoryDatabase<T> : IDatabase<T> where T : class
     {
-        private Dictionary<string, T> Db { get; set; }
-        private readonly object _locker;
-
-        public InMemoryDatabase()
-        {
-            Db = new Dictionary<string, T>();
-            _locker = new object();
-        }
+        private readonly Dictionary<string, T> Db = new();
+        private readonly object _locker = new();
 
         public IEnumerable<T> GetAll()
         {
-            foreach (var key in Db.Keys)
-            {
-                yield return Db[key];
-            }
+            lock (_locker)
+                return Db.Values.ToList();
         }
 
         public T? GetByKey(string id)
         {
-            if (Db.ContainsKey(id))
-            {
-                return Db[id];
-            }
-
-            return default;
+            lock (_locker)
+                return Db.TryGetValue(id, out var val) ? val : default;
         }
 
         public void Save(string id, T obj)
         {
             lock (_locker)
-            {
-                if (Db.ContainsKey(id))
-                {
-                    Db[id] = obj;
-                }
-                else
-                {
-                    Db.Add(id, obj);
-                }
-            }
+                Db[id] = obj;
         }
     }
 }

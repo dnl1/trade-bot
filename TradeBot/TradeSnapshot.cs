@@ -5,13 +5,13 @@ namespace TradeBot
     internal class TradeSnapshot
     {
         [JsonProperty("e")]
-        public string EventType { get; set; }
+        public string EventType { get; set; } = null!;
 
         [JsonProperty("E")]
         public long EventTime { get; set; }
 
         [JsonProperty("s")]
-        public string Symbol { get; set; }
+        public string Symbol { get; set; } = null!;
 
         [JsonProperty("a")]
         public long SellerOrderId { get; set; }

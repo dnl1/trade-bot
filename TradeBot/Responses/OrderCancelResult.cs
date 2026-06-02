@@ -10,15 +10,15 @@ namespace TradeBot.Responses
     internal class OrderCancelResult
     {
         [JsonProperty("symbol")]
-        public string Symbol { get; set; }
+        public string Symbol { get; set; } = null!;
 
         [JsonProperty("orderId")]
         public long OrderId { get; set; }
 
         [JsonProperty("origClientOrderId")]
-        public string OrigClientOrderId { get; set; }
+        public string OrigClientOrderId { get; set; } = null!;
 
         [JsonProperty("clientOrderId")]
-        public string ClientOrderId { get; set; }
+        public string ClientOrderId { get; set; } = null!;
     }
 }

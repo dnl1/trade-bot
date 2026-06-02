@@ -10,25 +10,25 @@ namespace TradeBot.Responses
     internal class OrderUpdateResult
     {
         [JsonProperty("e")]
-        public string EventType { get; set; }
+        public string EventType { get; set; } = null!;
 
         [JsonProperty("E")]
         public long EventTime { get; set; }
 
         [JsonProperty("s")]
-        public string Symbol { get; set; }
+        public string Symbol { get; set; } = null!;
 
         [JsonProperty("c")]
-        public string ClientOrderId { get; set; }
+        public string ClientOrderId { get; set; } = null!;
 
         [JsonProperty("S")]
-        public string Side { get; set; }
+        public string Side { get; set; } = null!;
 
         [JsonProperty("o")]
-        public string OrderType { get; set; }
+        public string OrderType { get; set; } = null!;
 
         [JsonProperty("f")]
-        public string TimeInForce { get; set; }
+        public string TimeInForce { get; set; } = null!;
 
         [JsonProperty("q")]
         public decimal Quantity { get; set; }
@@ -46,16 +46,16 @@ namespace TradeBot.Responses
         public long OrderListId { get; set; }
 
         [JsonProperty("C")]
-        public string CanceledOrderId { get; set; }
+        public string CanceledOrderId { get; set; } = null!;
 
         [JsonProperty("x")]
-        public string ExecutionType { get; set; }
+        public string ExecutionType { get; set; } = null!;
 
         [JsonProperty("X")]
-        public string Status { get; set; }
+        public string Status { get; set; } = null!;
 
         [JsonProperty("r")]
-        public string RejectReason { get; set; }
+        public string RejectReason { get; set; } = null!;
 
         [JsonProperty("i")]
         public long OrderId { get; set; }
@@ -67,13 +67,13 @@ namespace TradeBot.Responses
         public decimal CumulativeFilledQuantity { get; set; }
 
         [JsonProperty("L")]
-        public string LastExecutedPrice { get; set; }
+        public string LastExecutedPrice { get; set; } = null!;
 
         [JsonProperty("n")]
         public decimal CommissionAmount { get; set; }
 
         [JsonProperty("N")]
-        public object CommissionAsset { get; set; }
+        public object? CommissionAsset { get; set; }
 
         [JsonProperty("T")]
         public long TransactionTime { get; set; }
@@ -100,10 +100,10 @@ namespace TradeBot.Responses
         public decimal CumQuoteAssetTransactedQty { get; set; }
 
         [JsonProperty("Y")]
-        public string LastQuoteAssetTransactedQty { get; set; }
+        public string LastQuoteAssetTransactedQty { get; set; } = null!;
 
         [JsonProperty("Q")]
-        public string QuoteOrderQty { get; set; }
+        public string QuoteOrderQty { get; set; } = null!;
 
         public override string ToString()
         {

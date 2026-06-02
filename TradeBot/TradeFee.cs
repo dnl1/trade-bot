@@ -8,6 +8,6 @@ namespace TradeBot
         public decimal TakerCommission { get; set; }
 
         [JsonProperty("symbol")]
-        public string Symbol { get; set; }
+        public string Symbol { get; set; } = null!;
     }
 }

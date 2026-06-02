@@ -8,9 +8,7 @@ using Polly;
 using Polly.Extensions.Http;
 using System;
 using System.Globalization;
-using System.Collections.Generic;
 using System.Threading;
-using System.Linq;
 using TradeBot;
 using TradeBot.Database;
 using TradeBot.Factories;
@@ -19,14 +17,12 @@ using TradeBot.Repositories;
 using TradeBot.Services;
 using TradeBot.Settings;
 using TradeBot.Strategies;
-using System.Reflection;
+using TradeBot.Models;
 using TradeBot.Logger;
 using TradeBot.Logger.Sinks;
 
 public class Program
 {
-    private static IConfiguration? Configuration = null;
-
     public static void Main(string[] args)
     {
         Host.CreateDefaultBuilder(args)
@@ -34,15 +30,13 @@ public class Program
             {
                 builder.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                     .AddEnvironmentVariables();
-
-                Configuration = builder.Build();
             })
-            .ConfigureServices(services =>
+            .ConfigureServices((context, services) =>
             {
                 services.AddHostedService<TradingService>();
 
                 var appSettings = new AppSettings();
-                Configuration.Bind(appSettings);
+                context.Configuration.Bind(appSettings);
 
                 JobManager.Initialize();
 
@@ -55,7 +49,12 @@ public class Program
                 services.AddSingleton<StrategyFactory>();
                 services.AddSingleton<DefaultStrategy>();
                 services.AddSingleton<MultipleCoinsStrategy>();
-                services.AddSingleton(typeof(IDatabase<>), typeof(InMemoryDatabase<>));
+                services.AddSingleton<BollingerBandsStrategy>();
+                services.AddSingleton<ICandleRepository, CandleRepository>();
+                services.AddSingleton(sp => new CandleAggregator(
+                    appSettings.CandleTimeframeMinutes,
+                    sp.GetRequiredService<ICandleRepository>()));
+                services.AddSingleton<IPostgresConnectionFactory, PostgresConnectionFactory>();
                 services.AddSingleton<ICacher, Cacher>();
                 services.AddSingleton<ISnapshotRepository, SnapshotRepository>();
                 services.AddSingleton<IPairRepository, PairRepository>();
@@ -68,6 +67,9 @@ public class Program
                         .HandleTransientHttpError()
                         .WaitAndRetryAsync(20, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2,
                             retryAttempt))));
+
+                // Named "telegram" client so TelegramSink uses a managed handler (proper socket pooling)
+                services.AddHttpClient("telegram");
 
                 services.RemoveAll<IHttpMessageHandlerBuilderFilter>();
 

@@ -1,42 +1,46 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Net.Http;
 using TradeBot.Logger.Sinks;
 using TradeBot.Settings;
-using System.Net.Http;
 
 namespace TradeBot.Logger
 {
     public static class ServiceCollectionExtensions
     {
-        const string CONSOLE_LOGGER = "console";
-        const string TELEGRAM_LOGGER = "telegram";
+        private const string ConsoleKey  = "console";
+        private const string TelegramKey = "telegram";
+        private const string FileKey     = "file";
+
         public static IServiceCollection AddLoggers(this IServiceCollection services, AppSettings appSettings)
         {
             services.AddSingleton(sp =>
             {
-                var loggerBuilder = new LoggerBuilder();
+                var builder = new LoggerBuilder();
 
-                if (Array.Exists(appSettings.Loggers, logger => logger.Equals(CONSOLE_LOGGER)))
-                {
-                    loggerBuilder.AddConsole();
-                }
+                if (Has(appSettings, ConsoleKey))
+                    builder.AddConsole();
 
-                if (Array.Exists(appSettings.Loggers, logger => logger.Equals(TELEGRAM_LOGGER)) &&
-                    !string.IsNullOrEmpty(appSettings.TelegramBotId) &&
-                    !string.IsNullOrEmpty(appSettings.TelegramChatId))
+                if (Has(appSettings, FileKey))
+                    builder.AddFile(appSettings.LogFilePath);
+
+                if (Has(appSettings, TelegramKey)
+                    && !string.IsNullOrEmpty(appSettings.TelegramBotId)
+                    && !string.IsNullOrEmpty(appSettings.TelegramChatId))
                 {
                     var factory = sp.GetService<IHttpClientFactory>();
-                    loggerBuilder.AddTelegram(appSettings.TelegramBotId, appSettings.TelegramChatId, factory.CreateClient("telegram"));
+                    if (factory is not null)
+                        builder.AddTelegram(appSettings.TelegramBotId, appSettings.TelegramChatId,
+                            factory.CreateClient("telegram"));
                 }
 
-                return loggerBuilder.CreateLogger();
+                return builder.CreateLogger();
             });
 
             return services;
         }
+
+        private static bool Has(AppSettings s, string key) =>
+            Array.Exists(s.Loggers, l => l.Equals(key, StringComparison.OrdinalIgnoreCase));
     }
 }

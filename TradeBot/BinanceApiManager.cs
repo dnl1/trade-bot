@@ -15,7 +15,6 @@ namespace TradeBot
 {
     public class BinanceApiManager
     {
-        private readonly string _baseUrl;
         private readonly AppSettings _settings;
         private readonly ILogger _logger;
         private readonly ISnapshotRepository _snapshotRepository;
@@ -38,7 +37,7 @@ namespace TradeBot
             _apiClient = apiClient;
         }
 
-        internal async Task<OrderUpdateResult> BuyAlt(Coin origin, Coin target)
+        internal async Task<OrderUpdateResult?> BuyAlt(Coin origin, Coin target, decimal? maxBridgeAmount = null)
         {
             _tradeService.StartTradeLog(origin, target, Side.BUY);
 
@@ -48,7 +47,16 @@ namespace TradeBot
             var originBalance = await GetCurrencyBalance(originSymbol);
             var targetBalance = await GetCurrencyBalance(targetSymbol);
 
+            // Apply position-size cap if provided
+            if (maxBridgeAmount.HasValue)
+                targetBalance = Math.Min(targetBalance, maxBridgeAmount.Value);
+
             decimal fromCoinPrice = await GetTickerPrice(originSymbol + targetSymbol) ?? 0m;
+            if (fromCoinPrice <= 0)
+            {
+                _logger.Warn($"Stopping because price for {originSymbol + targetSymbol} is zero");
+                return null;
+            }
 
             double orderQty = await BuyQuantity(originSymbol, targetSymbol, targetBalance, fromCoinPrice);
 
@@ -65,7 +73,7 @@ namespace TradeBot
             OrderResult? order = null;
             using var orderGuard = _streamManager.AcquireOrderGuard();
 
-            while (null == order)
+            for (int attempt = 0; attempt < 3 && order is null; attempt++)
             {
                 try
                 {
@@ -73,11 +81,10 @@ namespace TradeBot
                 }
                 catch (Exception e)
                 {
-                    _logger.Error($"Error at trying to order limit buy {e}");
+                    _logger.Error($"Error at trying to order limit buy (attempt {attempt + 1}/3): {e}");
                 }
             }
-
-            if (order?.OrderId == 0) return null;
+            if (order is null || order.OrderId == 0) return null;
 
             _logger.Info($"BUY ORDER {order}");
 
@@ -96,7 +103,7 @@ namespace TradeBot
             return waitedOrder;
         }
 
-        internal async Task<OrderResult> SellAlt(Coin origin, Coin target)
+        internal async Task<OrderResult?> SellAlt(Coin origin, Coin target)
         {
             _tradeService.StartTradeLog(origin, target, Side.SELL);
 
@@ -107,6 +114,11 @@ namespace TradeBot
             var targetBalance = await GetCurrencyBalance(targetSymbol);
 
             decimal fromCoinPrice = await GetTickerPrice(originSymbol + targetSymbol) ?? 0m;
+            if (fromCoinPrice <= 0)
+            {
+                _logger.Warn($"Stopping because price for {originSymbol + targetSymbol} is zero");
+                return null;
+            }
 
             double orderQty = await SellQuantity(originSymbol, targetSymbol, originBalance);
 
@@ -120,10 +132,10 @@ namespace TradeBot
 
             _logger.Info($"Balance is {originBalance}");
 
-            OrderResult order = null;
+            OrderResult? order = null;
             using var orderGuard = _streamManager.AcquireOrderGuard();
 
-            while (null == order)
+            for (int attempt = 0; attempt < 3 && order is null; attempt++)
             {
                 try
                 {
@@ -131,12 +143,10 @@ namespace TradeBot
                 }
                 catch (Exception e)
                 {
-                    _logger.Error($"Error at trying to order limit sell {e}");
-                    return null;
+                    _logger.Error($"Error at trying to order limit sell (attempt {attempt + 1}/3): {e}");
                 }
             }
-
-            if (order?.OrderId == 0) return null;
+            if (order is null || order.OrderId == 0) return null;
 
             _logger.Info($"SELL ORDER {order}");
 
@@ -148,16 +158,20 @@ namespace TradeBot
 
             if (null == waitedOrder) return null;
 
-            decimal newBalance = await GetCurrencyBalance(originSymbol);
-            while (newBalance >= originBalance)
+            // Poll until balance drops (max 30 s); skip entirely if we started with zero balance
+            if (originBalance > 0)
             {
-                newBalance = await GetCurrencyBalance(originSymbol);
-                Thread.Sleep(1000);
+                decimal newBalance = await GetCurrencyBalance(originSymbol);
+                for (int poll = 0; poll < 30 && newBalance >= originBalance; poll++)
+                {
+                    await Task.Delay(1000);
+                    newBalance = await GetCurrencyBalance(originSymbol);
+                }
             }
 
             _logger.Info($"Sold {originSymbol}");
 
-            _tradeService.SetComplete(trade, order.CummulativeQuoteQty);
+            _tradeService.SetComplete(trade, waitedOrder.CumQuoteAssetTransactedQty);
 
             return order;
         }
@@ -165,20 +179,30 @@ namespace TradeBot
         internal async Task<decimal> GetMinNotional(string symbol, string bridge)
         {
             var symbolObj = await _apiClient.GetSymbolInfo(symbol + bridge);
+            if (symbolObj?.Filters is null) return 0m;
 
             var filter = symbolObj.Filters.Find(a => a.FilterType == "MIN_NOTIONAL");
 
-            return filter.MinNotional;
+            return filter?.MinNotional ?? 0m;
         }
 
         internal async Task<decimal> GetFee(Coin originCoin, Coin targetCoin, bool selling)
         {
-            TradeFee tradeFee = null;
+            const decimal DefaultTakerFee = 0.001m; // 0.1% fallback
+            TradeFee? tradeFee = null;
 
-            while(null == tradeFee)
+            for (int attempt = 0; attempt < 10 && tradeFee is null; attempt++)
             {
                 var tradeFees = await _apiClient.GetTradeFee();
-                tradeFee = tradeFees.FirstOrDefault(f => f.Symbol.Equals(originCoin.Symbol + _settings.Bridge));
+                tradeFee = tradeFees?.FirstOrDefault(f => f.Symbol.Equals(originCoin.Symbol + _settings.Bridge));
+                if (tradeFee is null && attempt < 9)
+                    await Task.Delay(1000);
+            }
+
+            if (tradeFee is null)
+            {
+                _logger.Warn($"[GetFee] Symbol {originCoin.Symbol + _settings.Bridge} not found in trade fees — using default {DefaultTakerFee:P1}");
+                return DefaultTakerFee;
             }
 
             var baseFee = tradeFee.TakerCommission;
@@ -198,7 +222,7 @@ namespace TradeBot
             else
             {
                 var originPrice = await GetTickerPrice(originCoin.Symbol + "BNB");
-                if (originPrice.Value == 0)
+                if (!originPrice.HasValue || originPrice.Value == 0)
                     return baseFee;
 
                 feeAmountBnb = feeAmount * originPrice.Value;
@@ -215,45 +239,47 @@ namespace TradeBot
         private async Task<bool> IsUsingBnbForFees()
         {
             var bnbBurnResult = await _apiClient.GetBnbBurnSpotMargin();
-
-            return bnbBurnResult.SpotBNBBurn;
+            return bnbBurnResult?.SpotBNBBurn ?? false;
         }
 
-        private async Task<OrderUpdateResult> WaitForOrder(long orderId, OrderGuard orderGuard, string originSymbol, string targetSymbol)
+        private async Task<OrderUpdateResult?> WaitForOrder(long orderId, OrderGuard orderGuard, string originSymbol, string targetSymbol)
         {
-            OrderUpdateResult? order = null;
-
-            while (null == order)
-            {
-                if (orderGuard.ContainsOrder())
-                {
-                    order = orderGuard.Get();
-                    _logger.Debug($"Waiting for order {orderId} to be created");
-                }
-                else
-                {
-                    orderGuard.Wait();
-                }
-
-                Thread.Sleep(1000);
-            }
+            var order = await orderGuard.WaitAsync();
 
             _logger.Debug($"Order created: {order}");
 
-            while (order.Status != OrderStatus.FILLED)
+            // Guard against unrecognized terminal states (EXPIRED, REJECTED) or network issues
+            for (int iteration = 0; iteration < 120; iteration++)
             {
+                if (order.Status == OrderStatus.FILLED)
+                {
+                    _logger.Debug($"Order filled: {order.OrderId}");
+                    return order;
+                }
+
+                if (order.Status == OrderStatus.CANCELED)
+                {
+                    _logger.Info("Order is canceled, going back to scouting mode...");
+                    return null;
+                }
+
+                if (order.Status == OrderStatus.EXPIRED || order.Status == OrderStatus.REJECTED)
+                {
+                    _logger.Warn($"Order {orderId} ended with status {order.Status}");
+                    return null;
+                }
+
+                _logger.Debug($"Waiting for order {orderId} to be filled");
+
                 try
                 {
-                    order = orderGuard.Get();
-
-                    _logger.Debug($"Waiting for order {orderId} to be filled");
-
                     if (await ShouldCancelOrder(order))
                     {
-                        OrderCancelResult? cancelOrder = null;
-                        while (cancelOrder == null)
+                        for (int attempt = 0; attempt < 10; attempt++)
                         {
-                            cancelOrder = await _apiClient.CancelOrder(originSymbol + targetSymbol, orderId);
+                            var cancelOrder = await _apiClient.CancelOrder(originSymbol + targetSymbol, orderId);
+                            if (cancelOrder is not null) break;
+                            await Task.Delay(1000);
                         }
 
                         _logger.Info("Order timeout, canceled");
@@ -264,23 +290,16 @@ namespace TradeBot
 
                             var orderQty = await SellQuantity(originSymbol, targetSymbol);
 
-                            OrderResult partiallyOrder = null;
-
-                            while (partiallyOrder == null)
+                            for (int attempt = 0; attempt < 10; attempt++)
                             {
-                                partiallyOrder = await _apiClient.OrderMarketSell(symbol: originSymbol + targetSymbol, quantity: orderQty);
+                                var partiallyOrder = await _apiClient.OrderMarketSell(symbol: originSymbol + targetSymbol, quantity: orderQty);
+                                if (partiallyOrder is not null) break;
+                                await Task.Delay(1000);
                             }
 
                             _logger.Info("Going back to scout mode...");
-
                             return null;
                         }
-                    }
-
-                    if (order.Status == OrderStatus.CANCELED)
-                    {
-                        _logger.Info("Order is canceled, going back to scouting mode...");
-                        return null;
                     }
                 }
                 catch (Exception e)
@@ -288,33 +307,32 @@ namespace TradeBot
                     _logger.Error("Error at WaitForOrder " + e.ToString());
                 }
 
-                if (order.Status != OrderStatus.FILLED)
-                    Thread.Sleep(1000);
+                await Task.Delay(1000);
+                // TryGet returns null if Dispose() removed the entry during the delay
+                order = orderGuard.TryGet() ?? order;
             }
 
-            _logger.Debug($"Order filled: {order.OrderId}");
-
-            return order;
+            _logger.Warn($"Order {orderId} timed out after 120 polling iterations");
+            return null;
         }
 
         private async Task<bool> ShouldCancelOrder(OrderUpdateResult order)
         {
-            long minutes = (DateTimeOffset.Now.ToUnixTimeSeconds() - order.TransactionTime) / 60;
+            // TransactionTime is in milliseconds (Unix ms from Binance WS event `T` field)
+            long elapsedMs = DateTimeOffset.Now.ToUnixTimeMilliseconds() - order.TransactionTime;
+            long elapsedMinutes = elapsedMs / 60_000;
             int timeout = order.Side == "SELL" ? _settings.SellTimeout : _settings.BuyTimeout;
 
-            if (timeout > 0 && minutes > timeout && order.Status == OrderStatus.NEW)
+            if (timeout > 0 && elapsedMinutes > timeout && order.Status == OrderStatus.NEW)
                 return true;
 
-            if (timeout > 0 && minutes > timeout && order.Status == OrderStatus.PARTIALLY_FILLED)
+            if (timeout > 0 && elapsedMinutes > timeout && order.Status == OrderStatus.PARTIALLY_FILLED)
             {
                 if (order.Side == "SELL") return true;
 
-                var currentPrice = (await GetTickerPrice(order.Symbol)).Value;
-
-                if (currentPrice * (1 - 0.001m) > order.Price)
-                {
+                var currentPrice = await GetTickerPrice(order.Symbol);
+                if (currentPrice.HasValue && currentPrice.Value * (1 - 0.001m) > order.Price)
                     return true;
-                }
             }
 
             return false;
@@ -324,6 +342,8 @@ namespace TradeBot
         {
             targetBalance = targetBalance ?? (await GetCurrencyBalance(targetSymbol));
             fromCoinPrice = fromCoinPrice ?? (await GetTickerPrice(originSymbol + targetSymbol)) ?? 0;
+
+            if (fromCoinPrice <= 0) return 0;
 
             decimal originTick = await GetAltTick(originSymbol, targetSymbol);
 
@@ -342,32 +362,77 @@ namespace TradeBot
         private async Task<decimal> GetAltTick(string originSymbol, string targetSymbol)
         {
             var symbol = await _apiClient.GetSymbolInfo(originSymbol + targetSymbol);
+            if (symbol?.Filters is null) return 0;
+
             var filter = symbol.Filters.Find(a => a.FilterType == "LOT_SIZE");
-            var stepSize = filter.StepSize;
+            if (filter?.StepSize is null) return 0;
 
-            if (stepSize.IndexOf('1') == 0)
-                return 1 - stepSize.IndexOf('.');
+            return ParseStepSizeDecimals(filter.StepSize);
+        }
 
-            return stepSize.IndexOf('1') - 1;
+        /// <summary>
+        /// Converts a Binance LOT_SIZE stepSize string to a decimal-place count for Math.Pow(10, n).
+        /// More robust than the previous IndexOf('1') approach which failed for stepSizes
+        /// like "2.00000000" or "5.00000000" (no '1' character → returned wrong 8 decimal places).
+        /// </summary>
+        private static decimal ParseStepSizeDecimals(string stepSize)
+        {
+            if (!decimal.TryParse(stepSize,
+                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var tick) || tick <= 0)
+                return 8; // safe default for invalid/suspended symbols
+
+            if (tick >= 1m) return 0; // whole-unit step (1, 2, 5, 10, …)
+
+            // Count decimal places by repeatedly multiplying until >= 1
+            int places = 0;
+            while (tick < 1m) { tick *= 10m; places++; }
+            return places;
         }
 
         public async Task<decimal> GetCurrencyBalance(string targetSymbol)
         {
-            Account account = null;
-            decimal? free = null;
-
-            while(null == account && null == free)
+            Account? account = null;
+            for (int attempt = 0; attempt < 30 && account is null; attempt++)
             {
                 account = await GetAccount();
-
-                if(null != account)
-                {
-                    free = account?.Balances?.Find(b => b.Asset.Equals(targetSymbol, StringComparison.Ordinal))?.Free;
-                }
+                if (account is null)
+                    await Task.Delay(1000);
             }
 
-            return free.GetValueOrDefault();
+            return account?.Balances?
+                .Find(b => b.Asset.Equals(targetSymbol, StringComparison.Ordinal))
+                ?.Free ?? 0m;
         }
+
+        internal async Task<OrderResult> PlaceStopLoss(string symbol, decimal qty, decimal stopPrice, decimal limitPrice)
+        {
+            stopPrice  = await RoundToTickSize(symbol, stopPrice);
+            limitPrice = await RoundToTickSize(symbol, limitPrice);
+            return await _apiClient.PlaceStopLossOrder(symbol, qty, stopPrice, limitPrice);
+        }
+
+        /// <summary>Rounds a price down to the nearest PRICE_FILTER tickSize for the symbol.</summary>
+        internal async Task<decimal> RoundToTickSize(string symbol, decimal price)
+        {
+            var info   = await _apiClient.GetSymbolInfo(symbol);
+            var filter = info?.Filters.Find(f => f.FilterType == "PRICE_FILTER");
+            if (filter?.TickSize is null) return price;
+
+            if (!decimal.TryParse(filter.TickSize,
+                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out var tick) || tick <= 0)
+                return price;
+
+            return Math.Floor(price / tick) * tick;
+        }
+
+        internal Task<OrderResult> GetOrder(string symbol, long orderId)
+            => _apiClient.GetOrder(symbol, orderId);
+
+        internal Task CancelStopOrder(string symbol, long orderId)
+            => _apiClient.CancelOrder(symbol, orderId);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal async Task<Account> GetAccount() =>

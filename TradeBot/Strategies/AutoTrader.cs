@@ -13,10 +13,10 @@ namespace TradeBot.Strategies
         private readonly IPairRepository _pairRepository;
         private readonly ISnapshotRepository _snapshotRepository;
         private readonly ICoinRepository _coinRepository;
-        private readonly AppSettings _appSettings;
+        protected readonly AppSettings _appSettings;
         private readonly BinanceApiManager _manager;
         private readonly ILogger _logger;
-        private readonly Coin BRIDGE;
+        protected readonly Coin _bridge;
 
         public AutoTrader(IPairRepository pairRepository,
             ISnapshotRepository snapshotRepository,
@@ -31,7 +31,7 @@ namespace TradeBot.Strategies
             _manager = manager;
             _logger = logger;
             _coinRepository = coinRepository;
-            BRIDGE = new Coin(appSettings.Bridge);
+            _bridge = new Coin(appSettings.Bridge);
         }
 
         public virtual Task Initialize()
@@ -65,7 +65,7 @@ namespace TradeBot.Strategies
                     if (bridgeBalance > minNotional)
                     {
                         _logger.Info($"Will be purchasing {coinSymbol} using bridge coin");
-                        await _manager.BuyAlt(coin, BRIDGE);
+                        await _manager.BuyAlt(coin, _bridge);
                         return coin;
                     }
                 }
@@ -78,7 +78,13 @@ namespace TradeBot.Strategies
         {
             bool canSell = false;
             var balance = await _manager.GetCurrencyBalance(pair.FromCoin.Symbol);
-            decimal fromCoinPrice = (await _manager.GetTickerPrice(pair.FromCoin.Symbol + _appSettings.Bridge)).Value;
+            var fromCoinPriceResult = await _manager.GetTickerPrice(pair.FromCoin.Symbol + _appSettings.Bridge);
+            if (!fromCoinPriceResult.HasValue)
+            {
+                _logger.Warn($"Skipping transaction — price for {pair.FromCoin.Symbol + _appSettings.Bridge} unavailable");
+                return;
+            }
+            decimal fromCoinPrice = fromCoinPriceResult.Value;
             decimal minNotional = await _manager.GetMinNotional(pair.FromCoin.Symbol, _appSettings.Bridge);
 
             if (balance > 0 && balance * fromCoinPrice > minNotional)
@@ -86,21 +92,21 @@ namespace TradeBot.Strategies
             else
                 _logger.Info("Skipping sell");
 
-            if (canSell)
+            if (!canSell)
+                return;
+
+            try
             {
-                try
-                {
-                    _logger.Info($"Selling {pair.FromCoin.Symbol}");
-                    await _manager.SellAlt(pair.FromCoin, BRIDGE);
-                }
-                catch (Exception e)
-                {
-                    _logger.Warn($"Couldn't sell, going back to scouting mode... Exception: {e}");
-                    return;
-                }
+                _logger.Info($"Selling {pair.FromCoin.Symbol}");
+                await _manager.SellAlt(pair.FromCoin, _bridge);
+            }
+            catch (Exception e)
+            {
+                _logger.Warn($"Couldn't sell, going back to scouting mode... Exception: {e}");
+                return;
             }
 
-            var order = await _manager.BuyAlt(pair.ToCoin, BRIDGE);
+            var order = await _manager.BuyAlt(pair.ToCoin, _bridge);
 
             if (null != order)
             {
@@ -108,6 +114,12 @@ namespace TradeBot.Strategies
                 await UpdateTradeThreshold(pair.ToCoin, order.Price);
                 return;
             }
+
+            // Buy failed — refresh the pair threshold to current market price so the same
+            // trade is not immediately re-attempted on the next scout cycle.
+            var fallbackPrice = await _manager.GetTickerPrice(pair.ToCoin.Symbol + _appSettings.Bridge);
+            if (fallbackPrice.HasValue)
+                await UpdateTradeThreshold(pair.ToCoin, fallbackPrice.Value);
 
             _logger.Info("Couldn't buy, going back to scouting mode...");
         }
@@ -137,7 +149,7 @@ namespace TradeBot.Strategies
             {
                 var optionalCoinPrice = await _manager.GetTickerPrice(pair.ToCoin.Symbol + _appSettings.Bridge);
 
-                if (!optionalCoinPrice.HasValue && optionalCoinPrice.Value <= 0)
+                if (!optionalCoinPrice.HasValue || optionalCoinPrice.Value <= 0)
 
                 {
                     _logger.Warn($"Skipping scouting... optional coin {pair.ToCoin.Symbol} not found");
@@ -149,7 +161,7 @@ namespace TradeBot.Strategies
                 //the price of scouting coin / tocoin's price
                 decimal optCoinRatio = coinPrice / optionalCoinPrice.Value;
 
-                decimal transactionFee = (await _manager.GetFee(pair.FromCoin, BRIDGE, true)) + (await _manager.GetFee(pair.ToCoin, BRIDGE, false));
+                decimal transactionFee = (await _manager.GetFee(pair.FromCoin, _bridge, true)) + (await _manager.GetFee(pair.ToCoin, _bridge, false));
 
                 decimal ratio = (optCoinRatio - transactionFee * _appSettings.ScoutMultiplier * optCoinRatio) - pair.Ratio;
 
@@ -167,7 +179,7 @@ namespace TradeBot.Strategies
 
                 if (coinPrice.GetValueOrDefault(0) == 0)
                 {
-                    _logger.Info($"Skipping update for coin {pair.ToCoin + _appSettings.Bridge} not found");
+                    _logger.Info($"Skipping update for pair {pair.FromCoin.Symbol + _appSettings.Bridge} — price not found");
                     continue;
                 }
 
@@ -180,27 +192,42 @@ namespace TradeBot.Strategies
         private void InitializeTradeThresholds()
         {
             var snapshots = _snapshotRepository.GetAll().ToList();
-            var pairsFromDb = _pairRepository.GetAll().ToList();
 
-            if (pairsFromDb.Count == snapshots.Count)
-                return;
+            // Always reinitialize from current snapshot prices.
+            // Persisted thresholds from a previous session (potentially days old) could
+            // trigger spurious trades immediately after a redeploy — fresh prices are safer.
+            if (snapshots.Count == 0)
+                return; // no live price data yet; defer until snapshots arrive
 
             var pairs = snapshots.SelectMany(x => snapshots, (x, y) => new Pair
             {
-                FromCoin = new Coin(x.Symbol.Replace(_appSettings.Bridge, string.Empty)),
-                ToCoin = new Coin(y.Symbol.Replace(_appSettings.Bridge, string.Empty))
+                FromCoin = new Coin(ExtractCoinName(x.Symbol, _appSettings.Bridge)),
+                ToCoin = new Coin(ExtractCoinName(y.Symbol, _appSettings.Bridge))
             }).Where(p => p.FromCoin.Symbol != p.ToCoin.Symbol);
 
             foreach (var item in pairs)
             {
-                var fromPrice = _snapshotRepository.Get(item.FromCoin.Symbol + _appSettings.Bridge).Price;
-                var toPrice = _snapshotRepository.Get(item.ToCoin.Symbol + _appSettings.Bridge).Price;
+                var fromSnapshot = _snapshotRepository.Get(item.FromCoin.Symbol + _appSettings.Bridge);
+                var toSnapshot = _snapshotRepository.Get(item.ToCoin.Symbol + _appSettings.Bridge);
+                if (fromSnapshot is null || toSnapshot is null) continue;
 
                 _logger.Info($"Initializing [{item.FromCoin.Symbol}] vs [{item.ToCoin.Symbol}]");
-                item.Ratio = fromPrice / toPrice;
+                item.Ratio = fromSnapshot.Price / toSnapshot.Price;
 
                 _pairRepository.Save(item);
             }
+        }
+
+        /// <summary>
+        /// Extracts the base asset name from a Binance symbol by removing the bridge suffix.
+        /// For example, "BTCUSDT" with bridge "USDT" returns "BTC".
+        /// Falls back to removing the first occurrence of bridge anywhere in the symbol.
+        /// </summary>
+        private static string ExtractCoinName(string symbol, string bridge)
+        {
+            if (symbol.EndsWith(bridge, StringComparison.Ordinal))
+                return symbol[..^bridge.Length];
+            return symbol.Replace(bridge, "", StringComparison.Ordinal);
         }
     }
 }

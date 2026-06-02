@@ -10,6 +10,6 @@ namespace TradeBot.Responses
     internal class ListenKeyWrapper
     {
         [JsonProperty("listenKey")]
-        public string ListenKey { get; set; }
+        public string ListenKey { get; set; } = null!;
     }
 }

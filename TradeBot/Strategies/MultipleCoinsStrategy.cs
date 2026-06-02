@@ -13,7 +13,6 @@ namespace TradeBot.Strategies
         private readonly ICoinRepository _coinRepository;
         private readonly ILogger _logger;
         private readonly BinanceApiManager _manager;
-        private readonly AppSettings _appSettings;
 
         public MultipleCoinsStrategy(IPairRepository pairRepository,
             ISnapshotRepository snapshotRepository,
@@ -25,17 +24,16 @@ namespace TradeBot.Strategies
             _coinRepository = coinRepository;
             _logger = logger;
             _manager = manager;
-            _appSettings = appSettings;
         }
 
         public override async Task Scout()
         {
-            _logger.Debug($"Running scouting proccess");
+            _logger.Debug("Running scouting process");
 
             var haveCoin = false;
 
             var currentCoin = _coinRepository.GetCurrent();
-            string currentCoinSymbol = null;
+            string? currentCoinSymbol = null;
 
             if(null != currentCoin)
             {
@@ -63,6 +61,10 @@ namespace TradeBot.Strategies
                 _logger.Debug($"I am scouting best trades. Current Coin {coinSymbol + _appSettings.Bridge}");
 
                 await JumpToBestCoin(new Coin(coinSymbol), coinPrice.Value);
+
+                // Stop after the first trade executed — avoid firing multiple trades in a
+                // single scout cycle which could exhaust bridge balance or double-commit.
+                break;
             }
 
             if (!haveCoin)

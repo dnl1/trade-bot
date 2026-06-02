@@ -388,3 +388,6 @@ FodyWeavers.xsd
 *.sln.iml
 
 **/appsettings.json
+# Secrets — never commit these
+.env
+TradeBot/appsettings.json

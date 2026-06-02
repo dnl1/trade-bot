@@ -13,8 +13,6 @@ namespace TradeBot.Strategies
         private readonly ICoinRepository _coinRepository;
         private readonly ILogger _logger;
         private readonly BinanceApiManager _manager;
-        private readonly AppSettings _appSettings;
-        private readonly Coin BRIDGE;
 
         public DefaultStrategy(IPairRepository pairRepository,
             ISnapshotRepository snapshotRepository,
@@ -26,9 +24,6 @@ namespace TradeBot.Strategies
             _coinRepository = coinRepository;
             _logger = logger;
             _manager = manager;
-            _appSettings = appSettings;
-
-            BRIDGE = new Coin(appSettings.Bridge);
         }
 
         public override async Task Initialize()
@@ -40,6 +35,12 @@ namespace TradeBot.Strategies
         public override async Task Scout()
         {
             var currentCoin = _coinRepository.GetCurrent();
+
+            if (currentCoin is null)
+            {
+                _logger.Warn("No current coin set, skipping scout cycle");
+                return;
+            }
 
             _logger.Info($"I am scouting the best trades. Current coin: {currentCoin.Symbol + _appSettings.Bridge} ");
 
@@ -57,10 +58,26 @@ namespace TradeBot.Strategies
         public override async Task<Coin?> BridgeScout()
         {
             var currentCoin = _coinRepository.GetCurrent();
+
+            if (currentCoin is null)
+            {
+                _logger.Warn("No current coin set, skipping bridge scout cycle");
+                return null;
+            }
+
             var coinBalance = await _manager.GetCurrencyBalance(currentCoin.Symbol);
             var minNotional = await _manager.GetMinNotional(currentCoin.Symbol, _appSettings.Bridge);
+            var coinPrice   = await _manager.GetTickerPrice(currentCoin.Symbol + _appSettings.Bridge);
 
-            if (coinBalance > minNotional) return null;
+            // Price unavailable (feed outage / rate-limit) — skip rather than trigger a coin switch
+            if (!coinPrice.HasValue)
+            {
+                _logger.Warn($"[BridgeScout] Price for {currentCoin.Symbol + _appSettings.Bridge} unavailable — skipping");
+                return null;
+            }
+
+            // Compare notional value (coin units × price) against USDT minimum
+            if (coinBalance * coinPrice.Value > minNotional) return null;
 
             var newCoin = await base.BridgeScout();
 

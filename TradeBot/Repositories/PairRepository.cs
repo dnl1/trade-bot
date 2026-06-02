@@ -1,50 +1,124 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
-using TradeBot.Database;
+using Npgsql;
 using TradeBot.Entities;
+using TradeBot.Database;
+using System.Linq;
 
 namespace TradeBot.Repositories
 {
     public class PairRepository : IPairRepository
     {
-        private readonly IDatabase<Pair> _database;
+        private readonly IPostgresConnectionFactory _connectionFactory;
 
-        public PairRepository(IDatabase<Pair> database)
+        public PairRepository(IPostgresConnectionFactory connectionFactory)
         {
-            _database = database;
+            _connectionFactory = connectionFactory;
         }
 
         public void Save(Pair pair)
         {
-            string key = GetKey(pair);
-            _database.Save(key, pair);
+            using var connection = _connectionFactory.OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO pairs (from_symbol, to_symbol, ratio)
+                VALUES (@fromSymbol, @toSymbol, @ratio)
+                ON CONFLICT (from_symbol, to_symbol)
+                DO UPDATE SET ratio = EXCLUDED.ratio
+                """;
+            command.Parameters.AddWithValue("fromSymbol", pair.FromCoin.Symbol);
+            command.Parameters.AddWithValue("toSymbol", pair.ToCoin.Symbol);
+            command.Parameters.AddWithValue("ratio", pair.Ratio);
+            command.ExecuteNonQuery();
         }
 
         public Pair? Get(string fromSymbol, string toSymbol)
         {
-            string key = GetKey(fromSymbol, toSymbol);
-            return _database.GetByKey(key);
+            using var connection = _connectionFactory.OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT from_symbol, to_symbol, ratio
+                FROM pairs
+                WHERE from_symbol = @fromSymbol AND to_symbol = @toSymbol
+                """;
+            command.Parameters.AddWithValue("fromSymbol", fromSymbol);
+            command.Parameters.AddWithValue("toSymbol", toSymbol);
+
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? MapPair(reader) : null;
         }
 
-        public IEnumerable<Pair> GetAll() => _database.GetAll();
+        public IEnumerable<Pair> GetAll()
+        {
+            using var connection = _connectionFactory.OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT from_symbol, to_symbol, ratio
+                FROM pairs
+                ORDER BY from_symbol, to_symbol
+                """;
 
-        private string GetKey(Pair pair)
-        {
-            return GetKey(pair.FromCoin.Symbol, pair.ToCoin.Symbol);
-        }
-        private string GetKey(string fromSymbol, string toSymbol)
-        {
-            return $"{fromSymbol}vs{toSymbol}";
+            using var reader = command.ExecuteReader();
+            var pairs = new List<Pair>();
+            while (reader.Read())
+            {
+                pairs.Add(MapPair(reader));
+            }
+
+            return pairs;
         }
 
         public IEnumerable<Pair> GetPairsFrom(Coin currentCoin)
         {
-            return _database.GetAll().Where(a => a.FromCoin.Symbol.Equals(currentCoin.Symbol));
+            using var connection = _connectionFactory.OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT from_symbol, to_symbol, ratio
+                FROM pairs
+                WHERE from_symbol = @fromSymbol
+                ORDER BY to_symbol
+                """;
+            command.Parameters.AddWithValue("fromSymbol", currentCoin.Symbol);
+
+            using var reader = command.ExecuteReader();
+            var pairs = new List<Pair>();
+            while (reader.Read())
+            {
+                pairs.Add(MapPair(reader));
+            }
+
+            return pairs;
         }
 
         public IEnumerable<Pair> GetPairsTo(Coin currentCoin)
         {
-            return _database.GetAll().Where(a => a.ToCoin.Symbol.Equals(currentCoin.Symbol));
+            using var connection = _connectionFactory.OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT from_symbol, to_symbol, ratio
+                FROM pairs
+                WHERE to_symbol = @toSymbol
+                ORDER BY from_symbol
+                """;
+            command.Parameters.AddWithValue("toSymbol", currentCoin.Symbol);
+
+            using var reader = command.ExecuteReader();
+            var pairs = new List<Pair>();
+            while (reader.Read())
+            {
+                pairs.Add(MapPair(reader));
+            }
+
+            return pairs;
+        }
+
+        private static Pair MapPair(NpgsqlDataReader reader)
+        {
+            return new Pair
+            {
+                FromCoin = new Coin(reader.GetString(0)),
+                ToCoin = new Coin(reader.GetString(1)),
+                Ratio = reader.GetDecimal(2)
+            };
         }
     }
 }

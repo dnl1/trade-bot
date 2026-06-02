@@ -56,5 +56,16 @@ namespace TradeBot.Tests.Entities
             trade.CryptoStartingBalance.Should().Be(0);
             trade.AltTradeAmount.Should().Be(0);
         }
+
+        [Fact]
+        public void Should_mark_trade_as_complete()
+        {
+            var trade = new Trade(10m, 20m, 5d);
+
+            trade.SetComplete(42.5m);
+
+            trade.CryptoTradingAmount.Should().Be(42.5m);
+            trade.State.Should().Be(TradeState.Complete);
+        }
     }
 }

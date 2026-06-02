@@ -13,6 +13,9 @@ namespace TradeBot.Logger
         public Logger(IEnumerable<ILogEventSink> sinks)
         {
             _sinks = sinks ?? throw new InvalidOperationException("Needs at least a sink to continue");
+
+            if (!_sinks.Any())
+                throw new InvalidOperationException("Needs at least a sink to continue");
         }
 
         public void Debug(string message)

@@ -1,50 +1,43 @@
-﻿
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading;
+using System.Threading.Tasks;
 using TradeBot.Responses;
-using System;
 
 namespace TradeBot
 {
-    internal class OrderGuard : IDisposable
+    internal class OrderGuard : System.IDisposable
     {
         private readonly ConcurrentDictionary<long, OrderUpdateResult> _pendingOrders;
-        private readonly Dictionary<long, ManualResetEventSlim> _mutexes;
+        private readonly ConcurrentDictionary<long, TaskCompletionSource<OrderUpdateResult>> _orderCompletions;
         private long _orderId;
 
-        public OrderGuard(ConcurrentDictionary<long, OrderUpdateResult> pendingOrders, Dictionary<long, ManualResetEventSlim> mutexes)
+        public OrderGuard(
+            ConcurrentDictionary<long, OrderUpdateResult> pendingOrders,
+            ConcurrentDictionary<long, TaskCompletionSource<OrderUpdateResult>> orderCompletions)
         {
             _pendingOrders = pendingOrders;
-            _mutexes = mutexes;
+            _orderCompletions = orderCompletions;
         }
 
         internal void SetOrder(long orderId)
         {
             _orderId = orderId;
-            _mutexes.Add(orderId, new ManualResetEventSlim(false));
+            var tcs = new TaskCompletionSource<OrderUpdateResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _orderCompletions[orderId] = tcs;
+
+            // Race guard: order may have arrived via WebSocket before SetOrder was called
+            if (_pendingOrders.TryGetValue(orderId, out var existing))
+                tcs.TrySetResult(existing);
         }
 
-        internal void Wait()
-        {
-            if(_mutexes.ContainsKey(_orderId))
-                _mutexes[_orderId].Wait();
-        }
+        internal Task<OrderUpdateResult> WaitAsync() => _orderCompletions[_orderId].Task;
 
-        internal bool ContainsOrder()
-        {
-            return _pendingOrders.ContainsKey(_orderId);
-        }
-
-        internal OrderUpdateResult Get()
-        {
-            return _pendingOrders[_orderId];
-        }
+        internal OrderUpdateResult? TryGet() =>
+            _pendingOrders.TryGetValue(_orderId, out var result) ? result : null;
 
         public void Dispose()
         {
             _pendingOrders.TryRemove(_orderId, out _);
-            _mutexes.Remove(_orderId, out _);
+            _orderCompletions.TryRemove(_orderId, out _);
         }
     }
 }

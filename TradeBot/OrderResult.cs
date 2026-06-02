@@ -10,7 +10,7 @@ namespace TradeBot
     public partial class OrderResult
     {
         [JsonProperty("symbol")]
-        public string Symbol { get; set; }
+        public string Symbol { get; set; } = null!;
 
         [JsonProperty("orderId")]
         public long OrderId { get; set; }
@@ -19,7 +19,7 @@ namespace TradeBot
         public long OrderListId { get; set; }
 
         [JsonProperty("clientOrderId")]
-        public string ClientOrderId { get; set; }
+        public string ClientOrderId { get; set; } = null!;
 
         [JsonProperty("transactTime")]
         public long TransactTime { get; set; }
@@ -28,25 +28,25 @@ namespace TradeBot
         public decimal Price { get; set; }
 
         [JsonProperty("origQty")]
-        public string OrigQty { get; set; }
+        public string OrigQty { get; set; } = null!;
 
         [JsonProperty("executedQty")]
-        public string ExecutedQty { get; set; }
+        public string ExecutedQty { get; set; } = null!;
 
         [JsonProperty("cummulativeQuoteQty")]
         public decimal CummulativeQuoteQty { get; set; }
 
         [JsonProperty("status")]
-        public string Status { get; set; }
+        public string Status { get; set; } = null!;
 
         [JsonProperty("timeInForce")]
-        public string TimeInForce { get; set; }
+        public string TimeInForce { get; set; } = null!;
 
         [JsonProperty("type")]
-        public string Type { get; set; }
+        public string Type { get; set; } = null!;
 
         [JsonProperty("side")]
-        public string Side { get; set; }
+        public string Side { get; set; } = null!;
 
         public override string ToString()
         {

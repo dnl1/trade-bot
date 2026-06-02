@@ -1,70 +1,68 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System;
+using System.Collections.Concurrent;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace TradeBot.Database
 {
     public class Cacher : ICacher
     {
-        private Dictionary<Type, Tuple<DateTime, object>?> _cacher;
+        private readonly ConcurrentDictionary<string, (DateTime Expiry, object Value)?> _cacher = new();
 
-        public Cacher()
+        // Per-key semaphores prevent the thundering-herd / double-invocation race:
+        // two concurrent callers for the same key both miss → both fire impl() → doubled API calls.
+        // GetOrAdd is atomic for inserting the semaphore; WaitAsync/Release serialize the actual fetch.
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> _keyLocks = new();
+
+        private SemaphoreSlim GetLock(string key) =>
+            _keyLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+
+        public T Execute<T>(Func<T> impl, TimeSpan ttl, string key = "")
         {
-            _cacher = new Dictionary<Type, Tuple<DateTime, object>?>();
+            var cacheKey = $"{typeof(T).FullName}:{key}";
+
+            // Fast path — no lock needed for a cache hit
+            if (_cacher.TryGetValue(cacheKey, out var entry) && entry.HasValue && entry.Value.Expiry >= DateTime.UtcNow)
+                if (entry.Value.Value is T cached) return cached;
+
+            var sem = GetLock(cacheKey);
+            sem.Wait();
+            try
+            {
+                // Double-check after acquiring the lock
+                if (_cacher.TryGetValue(cacheKey, out entry) && entry.HasValue && entry.Value.Expiry >= DateTime.UtcNow)
+                    if (entry.Value.Value is T hit) return hit;
+
+                T response = impl();
+                if (null != response)
+                    _cacher[cacheKey] = (DateTime.UtcNow.Add(ttl), response);
+                return response;
+            }
+            finally { sem.Release(); }
         }
 
-        public T Execute<T>(Func<T> impl, TimeSpan ttl)
+        public async Task<T> ExecuteAsync<T>(Func<Task<T>> impl, TimeSpan ttl, string key = "")
         {
-            var type = typeof(T);
+            var cacheKey = $"{typeof(T).FullName}:{key}";
 
-            if (_cacher.ContainsKey(type))
+            // Fast path — no lock needed for a cache hit
+            if (_cacher.TryGetValue(cacheKey, out var entry) && entry.HasValue && entry.Value.Expiry >= DateTime.UtcNow)
+                if (entry.Value.Value is T cached) return cached;
+
+            var sem = GetLock(cacheKey);
+            await sem.WaitAsync();
+            try
             {
-                var tpl = _cacher[type];
+                // Double-check after acquiring the lock
+                if (_cacher.TryGetValue(cacheKey, out entry) && entry.HasValue && entry.Value.Expiry >= DateTime.UtcNow)
+                    if (entry.Value.Value is T hit) return hit;
 
-                if (tpl.Item1 <= DateTime.Now)
-                {
-                    return (T) tpl.Item2;
-                }
+                var response = await impl();
+                if (null != response)
+                    _cacher[cacheKey] = (DateTime.UtcNow.Add(ttl), response);
+                return response;
             }
-            else
-            {
-                _cacher.Add(type, null);
-            }
-
-            T response = impl();
-
-            if(null != response)
-                _cacher[type] = Tuple.Create<DateTime, object>(DateTime.Now.Add(ttl), response);
-
-            return response;
-        }
-
-        public async Task<T> ExecuteAsync<T>(Func<Task<T>> impl, TimeSpan ttl)
-        {
-            var type = typeof(T);
-
-            if (_cacher.ContainsKey(type))
-            {
-                var tpl = _cacher[type];
-
-                if (tpl?.Item1 <= DateTime.Now)
-                {
-                    return (T)tpl.Item2;
-                }
-            }
-            else
-            {
-                _cacher.Add(type, null);
-            }
-
-            var response = await impl();
-
-            if (null != response)
-                _cacher[type] = Tuple.Create<DateTime, object>(DateTime.Now.Add(ttl), response);
-
-            return response;
+            finally { sem.Release(); }
         }
     }
 }

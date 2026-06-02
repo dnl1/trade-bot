@@ -1,7 +1,88 @@
-services:     
+services:
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: trade-bot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       tradebot
+      POSTGRES_USER:     tradebot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tradebot}
+    volumes:
+      - tradebot-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tradebot -d tradebot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Migrations (one-shot) ──────────────────────────────────────────────────
+  trade-bot-migrations:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    container_name: trade-bot-migrations
+    working_dir: /workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PostgresConnectionString: >-
+        Host=postgres;Port=5432;Database=tradebot;
+        Username=tradebot;Password=${POSTGRES_PASSWORD:-tradebot}
+    volumes:
+      - .:/workspace
+    command: ["dotnet", "run", "--project", "TradeBot.Migrations/TradeBot.Migrations.csproj"]
+
+  # ── Trade Bot ──────────────────────────────────────────────────────────────
   trade-bot:
-    image: trade-bot
+    image: trade-bot:latest
     container_name: trade-bot
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: TradeBot/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      trade-bot-migrations:
+        condition: service_completed_successfully
+    environment:
+      # ── Binance credentials (override via .env or environment) ──────────
+      apikey:            ${BINANCE_API_KEY}
+      apisecretkey:      ${BINANCE_SECRET_KEY:-}
+      # If RSA key is configured on the host, the container sees it at /app/binance_key.pem
+      apiPrivateKeyPath: ${BINANCE_RSA_KEY_PATH:+/app/binance_key.pem}
+      # ── Database ─────────────────────────────────────────────────────────
+      PostgresConnectionString: >-
+        Host=postgres;Port=5432;Database=tradebot;
+        Username=tradebot;Password=${POSTGRES_PASSWORD:-tradebot}
+      # ── Telegram ─────────────────────────────────────────────────────────
+      telegramBotId:  ${TELEGRAM_BOT_ID:-}
+      telegramChatId: ${TELEGRAM_CHAT_ID:-}
+      # ── Logging ──────────────────────────────────────────────────────────
+      logFilePath: /app/logs
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./logs:/app/logs                                 # persist log files
+      - ./TradeBot/appsettings.json:/app/appsettings.json:ro  # config read-only
+      - ${BINANCE_RSA_KEY_PATH:-/dev/null}:/app/binance_key.pem:ro
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "TradeBot.dll"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+volumes:
+  tradebot-postgres-data:

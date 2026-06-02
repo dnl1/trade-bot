@@ -1,37 +1,58 @@
-﻿using TradeBot.Database;
+﻿using System.Collections.Generic;
+using Npgsql;
+using TradeBot.Database;
 using TradeBot.Entities;
-using System.Collections.Generic;
 
 namespace TradeBot.Repositories
 {
     internal class CoinRepository : ICoinRepository
     {
-        private readonly IDatabase<Coin> _database;
+        private readonly IPostgresConnectionFactory _connectionFactory;
         private const string CURRENT_COIN = "CURRENT_COIN";
 
-        public CoinRepository(IDatabase<Coin> database)
+        public CoinRepository(IPostgresConnectionFactory connectionFactory)
         {
-            _database = database;
+            _connectionFactory = connectionFactory;
         }
 
         public void SaveCurrent(Coin coin)
         {
-            _database.Save(CURRENT_COIN, coin);
+            SaveCoin(CURRENT_COIN, coin.Symbol);
+            SaveCoin(coin.Symbol, coin.Symbol);
         }
 
         public void Save(IEnumerable<string> coins)
         {
             foreach (var coin in coins)
             {
-                _database.Save(coin, new Coin(coin));
+                SaveCoin(coin, coin);
             }
         }
 
-        public IEnumerable<Coin> GetAll()
+        public Coin? GetCurrent()
         {
-            return _database.GetAll();
+            using var connection = _connectionFactory.OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT symbol FROM coins WHERE key = @key";
+            command.Parameters.AddWithValue("key", CURRENT_COIN);
+
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? new Coin(reader.GetString(0)) : null;
         }
 
-        public Coin GetCurrent() => _database.GetByKey(CURRENT_COIN);
+        private void SaveCoin(string key, string symbol)
+        {
+            using var connection = _connectionFactory.OpenConnection();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO coins (key, symbol)
+                VALUES (@key, @symbol)
+                ON CONFLICT (key)
+                DO UPDATE SET symbol = EXCLUDED.symbol
+                """;
+            command.Parameters.AddWithValue("key", key);
+            command.Parameters.AddWithValue("symbol", symbol);
+            command.ExecuteNonQuery();
+        }
     }
 }

@@ -5,13 +5,13 @@ namespace TradeBot.Models
     public class Snapshot
     {
         [JsonProperty("e")]
-        public string EventType { get; set; }
+        public string EventType { get; set; } = null!;
 
         [JsonProperty("E")]
         public long EventTime { get; set; }
 
         [JsonProperty("s")]
-        public string Symbol { get; set; }
+        public string Symbol { get; set; } = null!;
 
         [JsonProperty("a")]
         public long AggTradeId { get; set; }
@@ -20,7 +20,7 @@ namespace TradeBot.Models
         public decimal Price { get; set; }
 
         [JsonProperty("q")]
-        public string Quantity { get; set; }
+        public string Quantity { get; set; } = null!;
 
         [JsonProperty("f")]
         public long FirstTradeId { get; set; }

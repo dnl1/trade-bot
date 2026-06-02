@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentScheduler;
@@ -11,6 +11,7 @@ namespace TradeBot.HostedServices
 {
     internal class TradingService : IHostedService
     {
+        private static readonly TimeSpan InitialSnapshotTimeout = TimeSpan.FromMinutes(2);
         private readonly AppSettings _settings;
         private readonly MarketDataListenerService _marketDataListenerService;
         private readonly StrategyFactory _strategyFactory;
@@ -30,42 +31,78 @@ namespace TradeBot.HostedServices
             _logger = logger;
         }
 
-        /// <summary>
-        /// Principal service
-        /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             _logger.Info("Starting");
 
             _coinRepository.Save(_settings.Coins);
 
-            await _marketDataListenerService.StartAsync();
+            await _marketDataListenerService.StartAsync(cancellationToken);
 
             var strategy = _strategyFactory.GetStrategy(_settings.Strategy);
 
             if (null == strategy)
-            {
-                _logger.Error("Invalid strategy name");
-                return;
-            }
+                throw new InvalidOperationException($"Invalid strategy name: '{_settings.Strategy}'");
 
             _logger.Info($"Chosen strategy: {_settings.Strategy}");
 
             _logger.Info("Waiting for snapshots to load");
-            _marketDataListenerService.Wait();
-            _logger.Info("Snapshots loaded with success");
+            if (!_marketDataListenerService.Wait(InitialSnapshotTimeout, cancellationToken))
+                throw new TimeoutException(
+                    $"Timed out after {InitialSnapshotTimeout.TotalSeconds:0}s waiting for initial " +
+                    $"snapshots for: {string.Join(", ", _settings.Coins)}");
+            _logger.Info("Snapshots loaded");
 
             await strategy.Initialize();
-
             await strategy.Scout();
-            JobManager.AddJob(async () => await strategy.Scout(), s => s.WithName("scouting").ToRunEvery(_settings.ScoutSleepTime).Minutes());
+
+            // SemaphoreSlim guards against overlapping Scout() invocations.
+            // The semaphore is acquired INSIDE Task.Run (not before) so that if
+            // Task.Run is cancelled the finally block still runs and releases it.
+            var scoutLock = new SemaphoreSlim(1, 1);
+
+            JobManager.AddJob(() =>
+            {
+                // Fire-and-forget inside a proper Task so exceptions are caught.
+                // Cancellation handled inside the lambda so finally always runs.
+                _ = Task.Run(async () =>
+                {
+                    if (!await scoutLock.WaitAsync(0, CancellationToken.None))
+                    {
+                        _logger.Warn("[Scout] Previous tick still running — skipping this interval");
+                        return;
+                    }
+                    using var timeoutCts = new CancellationTokenSource(
+                        TimeSpan.FromMinutes(_settings.ScoutTimeoutMinutes));
+                    try
+                    {
+                        var scout = strategy.Scout();
+                        var timeout = Task.Delay(Timeout.Infinite, timeoutCts.Token);
+                        if (await Task.WhenAny(scout, timeout) == timeout)
+                        {
+                            _logger.Error($"[Scout] Timed out after {_settings.ScoutTimeoutMinutes} min — releasing lock");
+                            return; // finally still runs → lock released
+                        }
+                        await scout; // re-observe any exception
+                    }
+                    catch (OperationCanceledException) { /* host shutting down */ }
+                    catch (Exception ex)
+                    {
+                        _logger.Error($"[Scout] Unhandled exception: {ex}");
+                    }
+                    finally
+                    {
+                        scoutLock.Release();
+                    }
+                }, CancellationToken.None); // CancellationToken.None so the Task itself isn't aborted mid-work
+
+            }, s => s.WithName("scouting").ToRunEvery(_settings.ScoutSleepTime).Minutes());
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            return Task.CompletedTask;
+            JobManager.StopAndBlock();
+            return _marketDataListenerService.StopAsync();
         }
     }
 }
