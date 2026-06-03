@@ -30,7 +30,7 @@ namespace TradeBot
         {
             _apiClient = binanceApiClient;
             _logger = logger;
-            _baseUrl = "wss://data-stream.binance.vision:443/ws";
+            _baseUrl = "wss://stream.binance.com:9443/ws"; // primary endpoint — more stable than data-stream.binance.vision
 
             _pendingOrders = new ConcurrentDictionary<long, OrderUpdateResult>();
             _orderCompletions = new ConcurrentDictionary<long, TaskCompletionSource<OrderUpdateResult>>();
@@ -84,7 +84,12 @@ namespace TradeBot
                     {
                         attempt++;
                         var delay = TimeSpan.FromSeconds(Math.Min(60, Math.Pow(2, attempt)));
-                        _logger.Warn($"[Stream] '{subscriberId}' disconnected (attempt {attempt}), reconnecting in {delay.TotalSeconds}s: {ex.Message}");
+                        // Binance drops connections every 24h or during maintenance — this is expected.
+                        var level = attempt <= 2 ? "INFO" : "WARN";
+                        if (attempt <= 2)
+                            _logger.Info($"[Stream] '{subscriberId}' reconnecting in {delay.TotalSeconds}s (attempt {attempt}): {ex.Message}");
+                        else
+                            _logger.Warn($"[Stream] '{subscriberId}' repeated disconnect (attempt {attempt}), reconnecting in {delay.TotalSeconds}s: {ex.Message}");
                         await Task.Delay(delay, cancellationToken);
                     }
                 }
@@ -197,11 +202,15 @@ namespace TradeBot
 
                     if (rcvResult.MessageType == WebSocketMessageType.Close)
                     {
-                        _logger.Warn($"Socket {socketName} closed tcp connection");
-                        await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
+                        // Binance often closes without completing the handshake — CloseAsync may throw; that's fine.
+                        _logger.Info($"[{socketName}] Server closed stream — reconnecting");
+                        try { await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None); }
+                        catch { /* connection already gone */ }
                         return;
                     }
 
+                    // Note: .NET ClientWebSocket handles WebSocket-level Ping/Pong automatically
+                    // at the transport layer — ReceiveAsync never surfaces Ping frames to the app.
                     ms.Write(buffer, 0, rcvResult.Count);
                 } while (!rcvResult.EndOfMessage);
 
