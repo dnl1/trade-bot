@@ -86,7 +86,7 @@ namespace TradeBot
                         var delay = TimeSpan.FromSeconds(Math.Min(60, Math.Pow(2, attempt)));
                         // Binance drops connections every 24h or during maintenance — this is expected.
                         if (attempt <= 3)
-                            _logger.Info($"[Stream] '{subscriberId}' reconnecting in {delay.TotalSeconds}s (attempt {attempt}): {ex.Message}");
+                            _logger.Debug($"[Stream] '{subscriberId}' reconnecting in {delay.TotalSeconds}s (attempt {attempt}): {ex.Message}");
                         else
                             _logger.Warn($"[Stream] '{subscriberId}' repeated disconnect (attempt {attempt}), reconnecting in {delay.TotalSeconds}s: {ex.Message}");
                         await Task.Delay(delay, cancellationToken);
@@ -202,7 +202,7 @@ namespace TradeBot
                     if (rcvResult.MessageType == WebSocketMessageType.Close)
                     {
                         // Binance often closes without completing the handshake — CloseAsync may throw; that's fine.
-                        _logger.Info($"[{socketName}] Server closed stream — reconnecting");
+                        _logger.Debug($"[{socketName}] Server closed stream — reconnecting");
                         try { await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None); }
                         catch { /* connection already gone */ }
                         return;
