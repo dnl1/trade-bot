@@ -73,7 +73,7 @@ services:
       - ./TradeBot/appsettings.json:/app/appsettings.json:ro  # config read-only
       - ${BINANCE_RSA_KEY_PATH:-/dev/null}:/app/binance_key.pem:ro
     healthcheck:
-      test: ["CMD", "pgrep", "-f", "TradeBot.dll"]
+      test: ["CMD-SHELL", "grep -q dotnet /proc/1/cmdline"]
       interval: 60s
       timeout: 10s
       retries: 3
