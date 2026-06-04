@@ -85,8 +85,7 @@ namespace TradeBot
                         attempt++;
                         var delay = TimeSpan.FromSeconds(Math.Min(60, Math.Pow(2, attempt)));
                         // Binance drops connections every 24h or during maintenance — this is expected.
-                        var level = attempt <= 2 ? "INFO" : "WARN";
-                        if (attempt <= 2)
+                        if (attempt <= 3)
                             _logger.Info($"[Stream] '{subscriberId}' reconnecting in {delay.TotalSeconds}s (attempt {attempt}): {ex.Message}");
                         else
                             _logger.Warn($"[Stream] '{subscriberId}' repeated disconnect (attempt {attempt}), reconnecting in {delay.TotalSeconds}s: {ex.Message}");
